@@ -18,7 +18,7 @@ object Main {
 
     val input = args(0)
     val output = args(1)
-    val rdd = Utils.readAsRDD(sc, input)
+    val rdd = Utils.readAsRdd(sc, input)
   }
 
 
