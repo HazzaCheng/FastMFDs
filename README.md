@@ -1,2 +1,2 @@
 # FunctionDependencyDiscover
-Find function dependencies from a large amount of data based on Spark.
+Discover function dependencies in distributed big data based on Spark.
