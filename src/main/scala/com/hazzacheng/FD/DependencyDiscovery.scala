@@ -38,7 +38,7 @@ object DependencyDiscovery {
     val s = mutable.StringBuilder.newBuilder
     attributes.foreach(attr => s.append(arr(attr)))
 
-    s
+    s.toString()
   }
 
 }
