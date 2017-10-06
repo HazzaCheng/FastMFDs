@@ -45,4 +45,34 @@ class UtilsTest extends FunSuite {
 //    println("Total hava " + size)
     assert(size === num * (1 << num - 1) - num)
   }
+
+  test("getCandidateDependencies") {
+    val num = 15
+    val dependencies = Utils.getDependencies(num)
+
+    val candidates = Utils.getCandidateDependencies(dependencies, 1)
+    var size1 = 0
+    var size2 = 0
+    dependencies.foreach(size1 += _._2.size)
+    candidates.foreach(size2 += _._2.size)
+//    candidates.foreach(println)
+//    println()
+//    dependencies.foreach(println)
+//    println("contains 1: " + size1 + " , " + "without 1: " + size2)
+//    println()
+    assert(size2 === (num - 1) * (1 << num - 2))
+    assert(size1 === num * (1 << num - 1) - num - size2)
+
+    val candidates2 = Utils.getCandidateDependencies(dependencies, 2)
+    var size3 = 0
+    var size4 = 0
+    dependencies.foreach(size3 += _._2.size)
+    candidates2.foreach(size4 += _._2.size)
+//    candidates2.foreach(println)
+//    println()
+//    dependencies.foreach(println)
+//    println("contains 2: " + size3 + " , " + "without 1,2: " + size4)
+    assert(size4 === (num - 2) * (1 << num - 3) + (1 << num - 2))
+    assert(size3 === num * (1 << num - 1) - num - size2 - size4)
+  }
 }

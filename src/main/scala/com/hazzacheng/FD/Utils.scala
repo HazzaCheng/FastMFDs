@@ -52,4 +52,17 @@ object Utils {
 
     subSets.toList
   }
+
+  def getCandidateDependencies(dependencies: mutable.HashMap[Set[Int], mutable.Set[Int]],
+                               target: Int): mutable.HashMap[Set[Int], mutable.Set[Int]] = {
+    val candidates = mutable.HashMap.empty[Set[Int], mutable.Set[Int]]
+    for (key <- dependencies.keys) {
+      if (key contains target) {
+        candidates += (key -> dependencies.get(key).get)
+        dependencies -= key
+      }
+    }
+
+    candidates
+  }
 }

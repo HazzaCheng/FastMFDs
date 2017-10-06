@@ -19,7 +19,7 @@ object Main {
     val input = args(0)
     val output = args(1)
     val rdd = Utils.readAsRdd(sc, input)
-    DependencyDiscovery.findOnSpark(sc, rdd)
+    //DependencyDiscovery.findOnSpark(sc, rdd)
   }
 
 
