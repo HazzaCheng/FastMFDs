@@ -40,4 +40,17 @@ object DependencyDiscovery {
     s.toString()
   }
 
+  def check(data: List[Array[String]], attributes: List[Int]): Int = {
+    val partitions = data.map(line => (takeAttributes(line, attributes), line)).groupBy(_._1).values
+
+    partitions.size
+  }
+
+  def repart(rdd: RDD[Array[String]], attribute: Int) = {
+    val partitions = rdd.map(line => (line(attribute), List(line)))
+      .reduceByKey(_ ++ _).map(t => t._2)
+
+    partitions
+  }
+
 }
