@@ -22,18 +22,16 @@ class DependencyDiscovery {
 object DependencyDiscovery {
   private val parallelScaleFactor = 4
 
-//  def findOnSpark(sc: SparkContext, rdd: RDD[Array[String]]): mutable.HashMap[Set[Int], mutable.Set[Int]] = {
-//    val nums = rdd.first().length
-//    var dependencies = Utils.getDependencies(nums)
-//
-//  }
+  def findOnSpark(sc: SparkContext, rdd: RDD[Array[String]]): mutable.HashMap[Set[Int], mutable.Set[Int]] = {
+    val nums = rdd.first().length
+    val dependencies = Utils.getDependencies(nums)
+    val results = mutable.HashMap.empty[Set[Int], mutable.Set[Int]]
 
-  def check(rdd: RDD[Array[String]], attributes: List[Int]): RDD[List[Array[String]]] = {
-    val partitions = rdd.map(line => (takeAttributes(line, attributes), List(line)))
-      .reduceByKey(_ ++  _).map(t => t._2)
-
-    partitions
+    for (i <- 1 to nums) {
+      val candidates = Utils.getCandidateDependencies(dependencies, i)
+    }
   }
+
 
   private def takeAttributes(arr: Array[String], attributes: List[Int]) = {
     val s = mutable.StringBuilder.newBuilder
