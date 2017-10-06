@@ -26,4 +26,19 @@ object DependencyDiscovery {
     val nums = rdd.first().length
     val dependencies = Utils.getDependencies(nums)
   }
+
+  def check(rdd: RDD[Array[String]], attributes: List[Int]): RDD[List[Array[String]]] = {
+    val partitions = rdd.map(line => (takeAttributes(line, attributes), List(line)))
+      .reduceByKey(_ ++  _).map(t => t._2)
+
+    partitions
+  }
+
+  private def takeAttributes(arr: Array[String], attributes: List[Int]) = {
+    val s = mutable.StringBuilder.newBuilder
+    attributes.foreach(attr => s.append(arr(attr)))
+
+    s
+  }
+
 }
