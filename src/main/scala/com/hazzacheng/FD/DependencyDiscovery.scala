@@ -29,6 +29,9 @@ object DependencyDiscovery {
 
     for (i <- 1 to nums) {
       val candidates = Utils.getCandidateDependencies(dependencies, i)
+      val lhs = candidates.keySet.toList.sortWith((x, y) => x.size > y.size)
+      val parations = repart(rdd, i)
+
     }
   }
 
@@ -40,8 +43,9 @@ object DependencyDiscovery {
     s.toString()
   }
 
-  def check(data: List[Array[String]], attributes: List[Int]): Int = {
-    val partitions = data.map(line => (takeAttributes(line, attributes), line)).groupBy(_._1).values
+  def check(lines: List[Array[String]], attributes: List[Int]): Int = {
+    val partitions = lines.map(line => (takeAttributes(line, attributes), line))
+      .groupBy(_._1).values
 
     partitions.size
   }
