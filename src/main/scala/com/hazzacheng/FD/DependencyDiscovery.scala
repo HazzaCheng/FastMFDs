@@ -33,6 +33,8 @@ object DependencyDiscovery {
       val parations = repart(rdd, i)
 
     }
+
+    results
   }
 
 
