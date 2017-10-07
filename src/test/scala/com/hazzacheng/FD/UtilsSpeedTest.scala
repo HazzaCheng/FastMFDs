@@ -54,12 +54,4 @@ class UtilsSpeedTest extends FunSuite {
 
   }
 
-
-  test("check"){
-    val l = List(Array("a","d","f"),Array("o","d","e"),Array("a","l","e"),
-      Array("a","t","e"))
-
-    check(l,List(2),List(1,3)).foreach(println(_))
-
-  }
 }

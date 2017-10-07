@@ -3,6 +3,7 @@ package com.hazzacheng.FD
 import org.apache.spark.SparkContext
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.rdd.RDD
+import Utils.getSubsets
 
 import scala.collection.mutable
 
@@ -58,6 +59,30 @@ object DependencyDiscovery {
       }
     }
 
+  }
+
+  def FindMinFD(fd :mutable.HashMap[Set[Int], Set[Int]]) = {
+    val minfd = mutable.HashMap.empty[Set[Int], mutable.Set[Int]]
+    val keys = fd.keySet.toList.sortWith((x,y) => x.size < y.size)
+    for(k1 <- keys){
+      for(k2 <- keys){
+        if(IsSubset(k1,k2) && (fd(k1) & fd(k2)).nonEmpty){
+           fd(k2) --= fd(k1) & fd(k2)
+          if(fd(k2).isEmpty){
+            fd -= (k2, fd(k2))
+          }
+        }
+      }
+    }
+    fd
+  }
+
+  def IsSubset(x:Set[Int], y:Set[Int]):Boolean = {
+    if(x.size >= y.size) false
+    else{
+      if(x ++ y == y)true
+      else false
+    }
   }
 
   def cut(map: mutable.HashMap[Set[Int], mutable.Set[Int]],
