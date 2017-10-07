@@ -1,6 +1,6 @@
 package com.hazzacheng.FD
 
-import com.hazzacheng.FD.DependencyDiscovery.repart
+import com.hazzacheng.FD.DependencyDiscovery.check
 import org.junit.runner.RunWith
 import org.scalatest.FunSuite
 import org.scalatest.junit.JUnitRunner
@@ -51,6 +51,15 @@ class UtilsSpeedTest extends FunSuite {
         }
       }
     }
+
+  }
+
+
+  test("check"){
+    val l = List(Array("a","d","f"),Array("o","d","e"),Array("a","l","e"),
+      Array("a","t","e"))
+
+    check(l,List(2),List(1,3)).foreach(println(_))
 
   }
 }

@@ -61,14 +61,18 @@ object DependencyDiscovery {
     s.toString()
   }
 
-  def check(data: RDD[Array[String]], attribute_x: List[Int], attribute_y: Int): Boolean = {
-    val partitions_x = data.map(line => (takeAttributes(line, attribute_x), List(line)))
-      .reduceByKey((A, B) => A++B).values.count()
-    val partitions_y = data.map(line => (takeAttributes(line, attribute_x :+ attribute_y), List(line)))
-      .reduceByKey((A, B) => A++B).values.count()
-    val result = partitions_x == partitions_y
+  def check(data: List[Array[String]], attribute_x: List[Int], attribute_y: List[Int]): List[Int] ={
+    val res = attribute_y.map(y => {
+      var flag = 0
+      val lhs = data.map(d => (takeAttributes(d, attribute_x),d)).groupBy(_._1).values.size
+      val rhs = data.map(d => (takeAttributes(d, attribute_x :+ y),d)).groupBy(_._1).values.size
+      if(lhs != rhs){
+        flag = y
+      }
+      flag
+    }).filter(_ > 0)
 
-    result
+    res
   }
 
   def repart(sc: SparkContext, rdd: RDD[Array[String]], attribute: Int): RDD[List[Array[String]]] = {
