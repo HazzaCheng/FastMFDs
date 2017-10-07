@@ -26,7 +26,14 @@ class UtilsSpeedTest extends FunSuite {
 
     for (i <- 1 to nums) {
       val candidates = Utils.getCandidateDependencies(dependencies, i)
-      val lhs = candidates.keySet.toList.sortWith((x, y) => x.size > y.size)
+      val lhs = candidates.keySet.toList.groupBy(_.size)
+      val keys = lhs.keys.toList.sortWith((x, y) => x > y)
+
+      for (k <- keys) {
+        val l = lhs.get(k).get
+        println("size: " + k + " " + l)
+      }
+
       println(i + " --- candidates: " + candidates.size + ", lhs: " + lhs.size)
     }
   }

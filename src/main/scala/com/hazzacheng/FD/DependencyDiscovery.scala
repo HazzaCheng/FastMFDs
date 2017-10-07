@@ -1,6 +1,7 @@
 package com.hazzacheng.FD
 
 import org.apache.spark.SparkContext
+import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.rdd.RDD
 
 import scala.collection.mutable
@@ -29,15 +30,31 @@ object DependencyDiscovery {
 
     for (i <- 1 to nums) {
       val candidates = Utils.getCandidateDependencies(dependencies, i)
-      val lhs = candidates.keySet.toList.sortWith((x, y) => x.size > y.size)
-      val parations = repart(rdd, i)
+      val candidatesBV = sc.broadcast(candidates)
+      val lhsAll = candidates.keySet.toList.groupBy(_.size)
+      val keys = lhsAll.keys.toList.sortWith((x, y) => x > y)
+      val partitions = repart(sc, rdd, i)
+
+      for (k <- keys) {
+        val ls = lhsAll.get(k).get
+        sc.parallelize(ls).map(lhs => )
+      }
 
     }
 
     results
   }
 
-  private def takeAttributes(arr: Array[String], attributes: List[Int]) = {
+  def checkDependencies(sc: SparkContext, partitions: RDD[List[Array[String]]],
+                        candidatesBV: Broadcast[mutable.HashMap[Set[Int], Set[Int]]],
+                        lhs: Set[Int]) = {
+    val rs = candidatesBV.value.get(lhs).get.toList
+    val failed = partitions.flatMap().distinct().map(rhs => (lhs, rhs))
+
+    failed
+  }
+
+  private def takeAttributes(arr: Array[String], attributes: List[Int]): String = {
     val s = mutable.StringBuilder.newBuilder
     attributes.foreach(attr => s.append(arr(attr - 1)))
 
@@ -45,15 +62,18 @@ object DependencyDiscovery {
   }
 
   def check(data: RDD[Array[String]], attribute_x: List[Int], attribute_y: Int): Boolean = {
-    val partitions_x = data.map(line => (takeAttributes(line, attribute_x), List(line))).reduceByKey((A, B) => A++B).values.count()
-    val partitions_y = data.map(line => (takeAttributes(line, attribute_x :+ attribute_y), List(line))).reduceByKey((A, B) => A++B).values.count()
+    val partitions_x = data.map(line => (takeAttributes(line, attribute_x), List(line)))
+      .reduceByKey((A, B) => A++B).values.count()
+    val partitions_y = data.map(line => (takeAttributes(line, attribute_x :+ attribute_y), List(line)))
+      .reduceByKey((A, B) => A++B).values.count()
     val result = partitions_x == partitions_y
+
     result
   }
 
-  def repart(rdd: RDD[Array[String]], attribute: Int) = {
+  def repart(sc: SparkContext, rdd: RDD[Array[String]], attribute: Int): RDD[List[Array[String]]] = {
     val partitions = rdd.map(line => (line(attribute - 1), List(line)))
-      .reduceByKey(_ ++ _).map(t => t._2).repartition(parallelScaleFactor * 30)
+      .reduceByKey(_ ++ _).map(t => t._2).repartition(sc.defaultParallelism * parallelScaleFactor)
 
     partitions
   }
