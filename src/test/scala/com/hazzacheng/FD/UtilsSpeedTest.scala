@@ -30,4 +30,20 @@ class UtilsSpeedTest extends FunSuite {
       println(i + " --- candidates: " + candidates.size + ", lhs: " + lhs.size)
     }
   }
+
+  test("loopMap") {
+    val nums = 15
+    val dependencies = Utils.getDependencies(nums)
+
+    for (i <- 1 to nums) {
+      val candidates = Utils.getCandidateDependencies(dependencies, i)
+      val lhs = candidates.keySet.toList.sortWith((x, y) => x.size > y.size)
+      for (l <- lhs) {
+        for (d <- candidates.get(l)) {
+          d
+        }
+      }
+    }
+
+  }
 }

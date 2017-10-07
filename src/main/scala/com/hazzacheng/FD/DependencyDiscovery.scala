@@ -22,20 +22,20 @@ class DependencyDiscovery {
 object DependencyDiscovery {
   private val parallelScaleFactor = 4
 
-  def findOnSpark(sc: SparkContext, rdd: RDD[Array[String]]): mutable.HashMap[Set[Int], mutable.Set[Int]] = {
-    val nums = rdd.first().length
-    val dependencies = Utils.getDependencies(nums)
-    val results = mutable.HashMap.empty[Set[Int], mutable.Set[Int]]
-
-    for (i <- 1 to nums) {
-      val candidates = Utils.getCandidateDependencies(dependencies, i)
-      val lhs = candidates.keySet.toList.sortWith((x, y) => x.size > y.size)
-      val parations = repart(rdd, i)
-
-    }
-
-    results
-  }
+//  def findOnSpark(sc: SparkContext, rdd: RDD[Array[String]]): mutable.HashMap[Set[Int], mutable.Set[Int]] = {
+//    val nums = rdd.first().length
+//    val dependencies = Utils.getDependencies(nums)
+//    val results = mutable.HashMap.empty[Set[Int], mutable.Set[Int]]
+//
+//    for (i <- 1 to nums) {
+//      val candidates = Utils.getCandidateDependencies(dependencies, i)
+//      val lhs = candidates.keySet.toList.sortWith((x, y) => x.size > y.size)
+//      val parations = repart(rdd, i)
+//      sc.parallelize(lhs).map(d => )
+//    }
+//
+//    results
+//  }
 
 
   private def takeAttributes(arr: Array[String], attributes: List[Int]) = {
