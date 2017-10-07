@@ -61,15 +61,12 @@ object DependencyDiscovery {
     s.toString()
   }
 
-  def check(data: List[Array[String]], attribute_x: List[Int], attribute_y: List[Int]): List[Int] ={
-    val res = attribute_y.map(y => {
-      var flag = 0
-      val lhs = data.map(d => (takeAttributes(d, attribute_x),d)).groupBy(_._1).values.size
-      val rhs = data.map(d => (takeAttributes(d, attribute_x :+ y),d)).groupBy(_._1).values.size
-      if(lhs != rhs){
-        flag = y
-      }
-      flag
+  def check(data: List[Array[String]], lhs: List[Int], rhs: List[Int]): List[Int] ={
+    val lSize = data.map(d => (takeAttributes(d, lhs),d)).groupBy(_._1).values.size
+    val res = rhs.map(y => {
+      val rSize = data.map(d => (takeAttributes(d, lhs :+ y),d)).groupBy(_._1).values.size
+      if(lSize != rSize) y
+      else 0
     }).filter(_ > 0)
 
     res
