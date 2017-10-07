@@ -37,7 +37,7 @@ object DependencyDiscovery {
 
       for (k <- keys) {
         val ls = lhsAll.get(k).get
-        sc.parallelize(ls).map(lhs => )
+        sc.parallelize(ls).map(lhs => checkDependencies(partitions, candidatesBV, ls))
       }
 
     }
@@ -45,11 +45,12 @@ object DependencyDiscovery {
     results
   }
 
-  def checkDependencies(sc: SparkContext, partitions: RDD[List[Array[String]]],
+  def checkDependencies(partitions: RDD[List[Array[String]]],
                         candidatesBV: Broadcast[mutable.HashMap[Set[Int], Set[Int]]],
-                        lhs: Set[Int]) = {
+                        lhs: Set[Int]): RDD[(Set[Int], Int)] = {
     val rs = candidatesBV.value.get(lhs).get.toList
-    val failed = partitions.flatMap().distinct().map(rhs => (lhs, rhs))
+    val failed = partitions.flatMap(p => check(p, lhs.toList, rs))
+      .distinct().map(rhs => (lhs, rhs))
 
     failed
   }
