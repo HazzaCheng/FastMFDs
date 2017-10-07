@@ -1,11 +1,8 @@
 package com.hazzacheng.FD
 
-import com.hazzacheng.FD.DependencyDiscovery.check
 import org.junit.runner.RunWith
 import org.scalatest.FunSuite
 import org.scalatest.junit.JUnitRunner
-
-import scala.collection.mutable
 
 /**
   * Created with IntelliJ IDEA.
@@ -17,15 +14,15 @@ import scala.collection.mutable
   * Time: 10:00 AM
   */
 @RunWith(classOf[JUnitRunner])
-class UtilsSpeedTest extends FunSuite {
+class FDUtilsSpeedTest extends FunSuite {
 
 
   test("map2list") {
     val nums = 15
-    val dependencies = Utils.getDependencies(nums)
+    val dependencies = FDUtils.getDependencies(nums)
 
     for (i <- 1 to nums) {
-      val candidates = Utils.getCandidateDependencies(dependencies, i)
+      val candidates = FDUtils.getCandidateDependencies(dependencies, i)
       val lhs = candidates.keySet.toList.groupBy(_.size)
       val keys = lhs.keys.toList.sortWith((x, y) => x > y)
 
@@ -40,10 +37,10 @@ class UtilsSpeedTest extends FunSuite {
 
   test("loopMap") {
     val nums = 15
-    val dependencies = Utils.getDependencies(nums)
+    val dependencies = FDUtils.getDependencies(nums)
 
     for (i <- 1 to nums) {
-      val candidates = Utils.getCandidateDependencies(dependencies, i)
+      val candidates = FDUtils.getCandidateDependencies(dependencies, i)
       val lhs = candidates.keySet.toList.sortWith((x, y) => x.size > y.size)
       for (l <- lhs) {
         for (d <- candidates.get(l)) {

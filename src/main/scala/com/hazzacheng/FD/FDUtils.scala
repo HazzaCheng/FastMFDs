@@ -15,7 +15,7 @@ import scala.collection.mutable.ListBuffer
   * Date: 2017-09-28
   * Time: 8:34 PM
   */
-object Utils {
+object FDUtils {
 
   def readAsRdd(sc: SparkContext, filePath: String): RDD[Array[String]] = {
     sc.textFile(filePath, sc.defaultParallelism * 4)
@@ -26,7 +26,7 @@ object Utils {
     val dependencies = mutable.HashMap.empty[Set[Int], mutable.Set[Int]]
     for (i <- 1 to num) {
       val nums = Range(1, num + 1).filter(_ != i).toArray
-      val subSets = Utils.getSubsets(nums)
+      val subSets = FDUtils.getSubsets(nums)
       for (subSet <- subSets) {
         var value = dependencies.getOrElse(subSet, mutable.Set.empty[Int])
         value += i
@@ -65,4 +65,43 @@ object Utils {
 
     candidates
   }
+
+  def takeAttributes(arr: Array[String], attributes: List[Int]): String = {
+    val s = mutable.StringBuilder.newBuilder
+    attributes.foreach(attr => s.append(arr(attr - 1)))
+
+    s.toString()
+  }
+
+  def check(data: List[Array[String]], lhs: List[Int], rhs: List[Int]): List[Int] ={
+    val lSize = data.map(d => (FDUtils.takeAttributes(d, lhs),d)).groupBy(_._1).values.size
+    val res = rhs.map(y => {
+      val rSize = data.map(d => (FDUtils.takeAttributes(d, lhs :+ y),d)).groupBy(_._1).values.size
+      if(lSize != rSize) y
+      else 0
+    }).filter(_ > 0)
+
+    res
+  }
+
+  def cut(map: mutable.HashMap[Set[Int], mutable.Set[Int]],
+          lhs: Set[Int], rhs: Int) = {
+    val v = map.get(lhs).get
+    if (v contains rhs) {
+      if (v.size == 1) map -= lhs
+      else {
+        v -= rhs
+        map.update(lhs, v)
+      }
+    }
+  }
+
+  def isSubset(x:Set[Int], y:Set[Int]):Boolean = {
+    if(x.size >= y.size) false
+    else{
+      if(x ++ y == y)true
+      else false
+    }
+  }
+
 }

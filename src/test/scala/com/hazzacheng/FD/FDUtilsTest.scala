@@ -15,7 +15,7 @@ import org.scalatest.junit.JUnitRunner
   */
 
 @RunWith(classOf[JUnitRunner])
-class UtilsTest extends FunSuite {
+class FDUtilsTest extends FunSuite {
 
   def arr2str(subSets: Array[String]): String = {
 
@@ -28,7 +28,7 @@ class UtilsTest extends FunSuite {
     val nums = Array(1, 2, 4)
     val expected = Array(Set(1, 2, 4), Set(1, 2), Set(1, 4), Set(1),
       Set(2), Set(2, 4), Set(4)).map(subSet => subSet.toString())
-    val res = Utils.getSubsets(nums).map(subSet => subSet.toString()).toArray
+    val res = FDUtils.getSubsets(nums).map(subSet => subSet.toString()).toArray
 //    println(arr2str(expected))
 //    println()
 //    println(arr2str(res))
@@ -37,7 +37,7 @@ class UtilsTest extends FunSuite {
 
   test("getDependencies") {
     val num = 15
-    val res = Utils.getDependencies(num)
+    val res = FDUtils.getDependencies(num)
 
     var size = 0
     res.foreach(size += _._2.size)
@@ -48,9 +48,9 @@ class UtilsTest extends FunSuite {
 
   test("getCandidateDependencies") {
     val num = 15
-    val dependencies = Utils.getDependencies(num)
+    val dependencies = FDUtils.getDependencies(num)
 
-    val candidates = Utils.getCandidateDependencies(dependencies, 1)
+    val candidates = FDUtils.getCandidateDependencies(dependencies, 1)
     var size1 = 0
     var size2 = 0
     dependencies.foreach(size1 += _._2.size)
@@ -63,7 +63,7 @@ class UtilsTest extends FunSuite {
     assert(size2 === (num - 1) * (1 << num - 2))
     assert(size1 === num * (1 << num - 1) - num - size2)
 
-    val candidates2 = Utils.getCandidateDependencies(dependencies, 2)
+    val candidates2 = FDUtils.getCandidateDependencies(dependencies, 2)
     var size3 = 0
     var size4 = 0
     dependencies.foreach(size3 += _._2.size)
@@ -74,5 +74,13 @@ class UtilsTest extends FunSuite {
 //    println("contains 2: " + size3 + " , " + "without 1,2: " + size4)
     assert(size4 === (num - 2) * (1 << num - 3) + (1 << num - 2))
     assert(size3 === num * (1 << num - 1) - num - size2 - size4)
+  }
+
+  test("check"){
+    val l = List(Array("a","d","k","u"),Array("a","d","e","u"),Array("a","l","e","b"),
+      Array("a","l","e","b"),Array("a","r","m","q"))
+
+    assert(FDUtils.check(l,List(1),List(4,3)).toArray.apply(0) === 4)
+    assert(FDUtils.check(l,List(1),List(4,3)).toArray.apply(1) === 3)
   }
 }

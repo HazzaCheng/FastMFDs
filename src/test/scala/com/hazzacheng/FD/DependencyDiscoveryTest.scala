@@ -1,32 +1,75 @@
 package com.hazzacheng.FD
 
-import com.hazzacheng.FD.DependencyDiscovery.FindMinFD
-import com.hazzacheng.FD.DependencyDiscovery.check
+import com.hazzacheng.FD.DependencyDiscovery.findMinFD
 import org.scalatest.FunSuite
 
 import scala.collection.mutable
 
 /**
-  * Created by Administrator on 2017/10/7.
+  * Created with IntelliJ IDEA.
+  *
+  * Description:
+  * User: HazzaCheng
+  * Contact: hazzacheng@gmail.com
+  * Date: 2017-10-06
+  * Time: 10:12 AM
   */
 class DependencyDiscoveryTest extends FunSuite {
-  test("check"){
-    val l = List(Array("a","d","k","u"),Array("a","d","e","u"),Array("a","l","e","b"),
-      Array("a","l","e","b"),Array("a","r","m","q"))
 
-    check(l,List(1),List(4,3)).foreach(println(_))
+  test("check dependencies") {
+    val nums = 4
+    val dependencies = FDUtils.getDependencies(nums)
+    val candidates = FDUtils.getCandidateDependencies(dependencies, 1)
+    val failed = Array((Set(1, 3), 4), (Set(1, 3, 4), 2))
+
+    var size1 = 0
+    var size2 = 0
+    dependencies.foreach(x => size1 += x._2.size)
+    candidates.foreach(x => size2 += x._2.size)
+
+//    dependencies.foreach(println)
+//    println()
+//    candidates.foreach(println)
+//    println()
+
+    DependencyDiscovery.cutLeaves(dependencies, candidates, failed, 1)
+
+    var size3 = 0
+    var size4 = 0
+    dependencies.foreach(x => size3 += x._2.size)
+    candidates.foreach(x => size4 += x._2.size)
+
+//    dependencies.foreach(println)
+//    println()
+//    candidates.foreach(println)
+//    println()
+
+    assert(size1 === size3 + 4)
+    assert(size2 === size4 + 6)
+  }
+
+  test("findMinFD") {
+    val d = mutable.HashMap((Set(1,2,4), mutable.Set(7,8)),
+      (Set(1,2,3), mutable.Set(8)),
+      (Set(1,2), mutable.Set(7)),
+      (Set(1,2,5), mutable.Set(6,9)),
+      (Set(2,9), mutable.Set(3,6,1)),
+      (Set(5), mutable.Set(9)))
+
+    val minFD = findMinFD(d)
+
+//    for(k <- minFD) {
+//      k._1.foreach(x => print(x + " "))
+//      print("--> ")
+//      k._2.foreach(x => print(x + " "))
+//      print("\n")
+//    }
+
+    var size = 0
+    minFD.foreach(x => size += x._2.size)
+
+    assert(size === 8)
 
   }
 
-  test("FindMinFD"){
-    //val d = mutable.HashMap.empty[Set[Int], mutable.Set[Int]]
-    val d = mutable.HashMap((Set(1,2,4),Set(7,8)), (Set(1,2,3),Set(8)), (Set(1,2),Set(7)),
-      (Set(1,2,5),Set(6,9)), (Set(2,9),Set(3,6,1)), (Set(5),Set(9)))
-    for(k <- FindMinFD(d)){
-      k._1.foreach(print(_))
-      print("-->")
-      k._2.foreach(print(_))
-      print("\n")
-    }
-  }
 }

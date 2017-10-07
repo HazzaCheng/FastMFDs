@@ -15,11 +15,12 @@ object Main {
 
   def main(args: Array[String]): Unit = {
     val sc = new SparkContext()
-
     val input = args(0)
     val output = args(1)
-    val rdd = Utils.readAsRdd(sc, input)
-    //DependencyDiscovery.findOnSpark(sc, rdd)
+
+    val rdd = FDUtils.readAsRdd(sc, input)
+    val res = DependencyDiscovery.findOnSpark(sc, rdd)
+    val minFD = DependencyDiscovery.findMinFD(res)
   }
 
 
