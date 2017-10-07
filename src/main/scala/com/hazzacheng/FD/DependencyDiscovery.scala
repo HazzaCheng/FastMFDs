@@ -30,14 +30,14 @@ object DependencyDiscovery {
 
     for (i <- 1 to nums) {
       val candidates = Utils.getCandidateDependencies(dependencies, i)
-      val candidatesBV = sc.broadcast(candidates)
       val lhsAll = candidates.keySet.toList.groupBy(_.size)
       val keys = lhsAll.keys.toList.sortWith((x, y) => x > y)
       val partitions = repart(sc, rdd, i)
 
       for (k <- keys) {
+        val candidatesBV = sc.broadcast(candidates)
         val ls = lhsAll.get(k).get
-        sc.parallelize(ls).map(lhs => checkDependencies(partitions, candidatesBV, ls))
+        val failed = sc.parallelize(ls).map(lhs => checkDependencies(partitions, candidatesBV, lhs)).collect()
       }
 
     }
@@ -45,14 +45,22 @@ object DependencyDiscovery {
     results
   }
 
-  def checkDependencies(partitions: RDD[List[Array[String]]],
-                        candidatesBV: Broadcast[mutable.HashMap[Set[Int], Set[Int]]],
-                        lhs: Set[Int]): RDD[(Set[Int], Int)] = {
-    val rs = candidatesBV.value.get(lhs).get.toList
-    val failed = partitions.flatMap(p => check(p, lhs.toList, rs))
-      .distinct().map(rhs => (lhs, rhs))
+  def cutLeaves(dependencies: mutable.HashMap[Set[Int], mutable.Set[Int]],
+                candidates: mutable.HashMap[Set[Int], mutable.Set[Int]],
+                failed: Array[Array[(Set[Int], Int)]]) = {
 
-    failed
+  }
+
+  def checkDependencies(partitions: RDD[List[Array[String]]],
+                        candidatesBV: Broadcast[mutable.HashMap[Set[Int], mutable.Set[Int]]],
+                        lhs: Set[Int]): Array[(Set[Int], Int)] = {
+    val existed = candidatesBV.value.get(lhs)
+    if (existed != None) {
+      val rs = existed.get.toList
+      val failed = partitions.flatMap(p => check(p, lhs.toList, rs))
+        .distinct().map(rhs => (lhs, rhs))
+      failed.collect()
+    } else Array()
   }
 
   private def takeAttributes(arr: Array[String], attributes: List[Int]): String = {
