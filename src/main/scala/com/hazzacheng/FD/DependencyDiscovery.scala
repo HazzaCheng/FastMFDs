@@ -37,7 +37,9 @@ object DependencyDiscovery {
       for (k <- keys) {
         val candidatesBV = sc.broadcast(candidates)
         val ls = lhsAll.get(k).get
-        val failed = sc.parallelize(ls).map(lhs => checkDependencies(partitions, candidatesBV, lhs)).collect()
+        val failed = sc.parallelize(ls).flatMap(lhs => checkDependencies(partitions, candidatesBV, lhs)).collect()
+        cutLeaves(dependencies, candidates, failed, i)
+        results ++= candidates
       }
 
     }
@@ -47,9 +49,29 @@ object DependencyDiscovery {
 
   def cutLeaves(dependencies: mutable.HashMap[Set[Int], mutable.Set[Int]],
                 candidates: mutable.HashMap[Set[Int], mutable.Set[Int]],
-                failed: Array[Array[(Set[Int], Int)]]) = {
+                failed: Array[(Set[Int], Int)], commonAttr: Int) = {
+    for (d <- failed) {
+      val subSets = Utils.getSubsets(d._1.toArray)
+      for (subSet <- subSets) {
+        if (subSet contains commonAttr) cut(candidates, subSet, d._2)
+        else cut(dependencies, subSet, d._2)
+      }
+    }
 
   }
+
+  def cut(map: mutable.HashMap[Set[Int], mutable.Set[Int]],
+                      lhs: Set[Int], rhs: Int) = {
+    val v = map.get(lhs).get
+    if (v contains rhs) {
+      if (v.size == 1) map -= lhs
+      else {
+        v -= rhs
+        map.update(lhs, v)
+      }
+    }
+  }
+
 
   def checkDependencies(partitions: RDD[List[Array[String]]],
                         candidatesBV: Broadcast[mutable.HashMap[Set[Int], mutable.Set[Int]]],
