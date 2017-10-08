@@ -91,12 +91,15 @@ object FDUtils {
 
   def cut(map: mutable.HashMap[Set[Int], mutable.Set[Int]],
           lhs: Set[Int], rhs: Int) = {
-    val v = map.get(lhs).get
-    if (v contains rhs) {
-      if (v.size == 1) map -= lhs
-      else {
-        v -= rhs
-        map.update(lhs, v)
+    val ot = map.get(lhs)
+    if (ot != None) {
+      val v = ot.get
+      if (v contains rhs) {
+        if (v.size == 1) map -= lhs
+        else {
+          v -= rhs
+          map.update(lhs, v)
+        }
       }
     }
   }
