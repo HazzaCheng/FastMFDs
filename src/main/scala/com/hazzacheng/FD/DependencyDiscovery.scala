@@ -24,6 +24,7 @@ object DependencyDiscovery {
   def findOnSpark(sc: SparkContext, rdd: RDD[Array[String]]): mutable.HashMap[Set[Int], mutable.Set[Int]] = {
     val nums = rdd.first().length
     val dependencies = FDUtils.getDependencies(nums)
+    val emptyFD = mutable.Set.empty[Int]
     val results = mutable.HashMap.empty[Set[Int], mutable.Set[Int]]
 
     for (i <- 1 to nums) {
@@ -31,6 +32,7 @@ object DependencyDiscovery {
       val lhsAll = candidates.keySet.toList.groupBy(_.size)
       val keys = lhsAll.keys.toList.sortWith((x, y) => x > y)
       val partitions = repart(sc, rdd, i)
+      if (partitions.count() == 1) emptyFD += i
 
       for (k <- keys) {
         val candidatesBV = sc.broadcast(candidates)
@@ -41,6 +43,7 @@ object DependencyDiscovery {
       }
 
     }
+    if (emptyFD.size > 0) results += (Set.empty[Int] -> emptyFD)
 
     results
   }
