@@ -107,9 +107,11 @@ object DependencyDiscovery {
     val keys = fd.keySet.toList.sortWith((x,y) => x.size < y.size)
     for(k1 <- keys){
       for(k2 <- keys){
-        if(FDUtils.isSubset(k1,k2) && (fd(k1) & fd(k2)).nonEmpty){
-          fd(k2) --= fd(k1) & fd(k2)
-          if(fd(k2).isEmpty) fd -= k2
+        if(fd.contains(k2) && fd.contains(k1)) {
+          if (FDUtils.isSubset(k1, k2) && (fd(k1) & fd(k2)).nonEmpty) {
+            fd(k2) --= fd(k1) & fd(k2)
+            if (fd(k2).isEmpty) fd -= k2
+          }
         }
       }
     }
