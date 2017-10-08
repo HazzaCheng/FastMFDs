@@ -22,7 +22,10 @@ object FDUtils {
       .map(line => line.split(",").map(word => word.trim()))
   }
 
-  def outPutFormat()
+  def outPutFormat(minFD: mutable.HashMap[Set[Int], mutable.Set[Int]]): List[String] = {
+    minFD.map(d => d._1.map(x => "column" + x).toList.sorted.mkString("[", ",", "]")
+    + ":" + d._2.map(x => "column" + x).toList.sorted.mkString(",")).toList
+  }
 
   def getDependencies(num: Int): mutable.HashMap[Set[Int], mutable.Set[Int]]= {
     val dependencies = mutable.HashMap.empty[Set[Int], mutable.Set[Int]]

@@ -4,6 +4,8 @@ import org.junit.runner.RunWith
 import org.scalatest.FunSuite
 import org.scalatest.junit.JUnitRunner
 
+import scala.collection.mutable
+
 /**
   * Created with IntelliJ IDEA.
   *
@@ -82,5 +84,14 @@ class FDUtilsTest extends FunSuite {
 
     assert(FDUtils.check(l,List(1),List(4,3)).toArray.apply(0) === 4)
     assert(FDUtils.check(l,List(1),List(4,3)).toArray.apply(1) === 3)
+  }
+
+  test("output") {
+    val fdMin = mutable.HashMap.empty[Set[Int], mutable.Set[Int]]
+    fdMin += (Set.empty[Int] -> mutable.Set[Int](1, 2, 3))
+    fdMin += (Set(1, 2) -> mutable.Set[Int](4, 5))
+
+    val str = FDUtils.outPutFormat(fdMin)
+    str.foreach(println)
   }
 }
