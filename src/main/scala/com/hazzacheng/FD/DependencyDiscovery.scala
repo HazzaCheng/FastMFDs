@@ -43,9 +43,10 @@ object DependencyDiscovery {
       }
 
     }
+    val minFD = DependencyDiscovery.findMinFD(results)
     if (emptyFD.size > 0) results += (Set.empty[Int] -> emptyFD)
 
-    results
+    minFD
   }
 
   def repart(sc: SparkContext, rdd: RDD[Array[String]], attribute: Int): RDD[List[Array[String]]] = {

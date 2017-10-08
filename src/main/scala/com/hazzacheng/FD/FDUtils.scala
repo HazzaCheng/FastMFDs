@@ -22,6 +22,8 @@ object FDUtils {
       .map(line => line.split(",").map(word => word.trim()))
   }
 
+  def outPutFormat()
+
   def getDependencies(num: Int): mutable.HashMap[Set[Int], mutable.Set[Int]]= {
     val dependencies = mutable.HashMap.empty[Set[Int], mutable.Set[Int]]
     for (i <- 1 to num) {

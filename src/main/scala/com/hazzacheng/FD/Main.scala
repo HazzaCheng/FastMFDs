@@ -20,7 +20,7 @@ object Main {
 
     val rdd = FDUtils.readAsRdd(sc, input)
     val res = DependencyDiscovery.findOnSpark(sc, rdd)
-    val minFD = DependencyDiscovery.findMinFD(res)
+
   }
 
 
