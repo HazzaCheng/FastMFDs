@@ -16,7 +16,7 @@ import scala.collection.mutable
   */
 class DependencyDiscoveryTest extends FunSuite {
 
-  test("check dependencies") {
+  test("cut leaves") {
     val nums = 4
     val dependencies = FDUtils.getDependencies(nums)
     val candidates = FDUtils.getCandidateDependencies(dependencies, 1)

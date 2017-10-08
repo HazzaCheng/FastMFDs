@@ -7,6 +7,7 @@ import FDUtils.getSubsets
 
 import scala.collection.immutable.HashMap
 import scala.collection.mutable
+import scala.collection.mutable.ListBuffer
 
 /**
   * Created with IntelliJ IDEA.
@@ -37,7 +38,9 @@ object DependencyDiscovery {
       for (k <- keys) {
         val candidatesBV = sc.broadcast(candidates)
         val ls = lhsAll.get(k).get
-        val failed = sc.parallelize(ls).flatMap(lhs => checkDependencies(partitions, candidatesBV, lhs)).collect()
+        val lsBV = sc.broadcast(ls)
+        val failed = partitions.flatMap(p => checkDependencies(p, candidatesBV, lsBV)).distinct().collect()
+//        val failed = sc.parallelize(ls).flatMap(lhs => checkDependencies(partitions, candidatesBV, lhs)).collect()
         cutLeaves(dependencies, candidates, failed, i)
         results ++= candidates
       }
@@ -56,18 +59,33 @@ object DependencyDiscovery {
     partitions
   }
 
-  def checkDependencies(partitions: RDD[List[Array[String]]],
-                        candidatesBV: Broadcast[mutable.HashMap[Set[Int], mutable.Set[Int]]],
-                        lhs: Set[Int]): Array[(Set[Int], Int)] = {
-    val existed = candidatesBV.value.get(lhs)
-    if (existed != None) {
-      val rs = existed.get.toList
-      val failed = partitions.flatMap(p => FDUtils.check(p, lhs.toList, rs))
-        .distinct().map(rhs => (lhs, rhs))
-      failed.collect()
-    } else Array()
-  }
+//  def checkDependencies(partitions: RDD[List[Array[String]]],
+//                        candidatesBV: Broadcast[mutable.HashMap[Set[Int], mutable.Set[Int]]],
+//                        lhs: Set[Int]): Array[(Set[Int], Int)] = {
+//    val existed = candidatesBV.value.get(lhs)
+//    if (existed != None) {
+//      val rs = existed.get.toList
+//      val failed = partitions.flatMap(p => FDUtils.check(p, lhs.toList, rs))
+//        .distinct().map(rhs => (lhs, rhs))
+//      failed.collect()
+//    } else Array()
+//  }
 
+  def checkDependencies(p: List[Array[String]],
+                        candidatesBV: Broadcast[mutable.HashMap[Set[Int], mutable.Set[Int]]],
+                        lsBV: Broadcast[List[Set[Int]]]): List[(Set[Int], Int)] = {
+    val failed = new ListBuffer[(Set[Int], Int)]()
+    for (lhs <- lsBV.value) {
+      val existed = candidatesBV.value.get(lhs)
+      if (existed != None) {
+        val rs = existed.get.toList
+        val fail = FDUtils.check(p, lhs.toList, rs).map(rhs => (lhs, rhs))
+        failed ++= fail
+      }
+    }
+
+    failed.toList
+  }
 
 
   def cutLeaves(dependencies: mutable.HashMap[Set[Int], mutable.Set[Int]],
