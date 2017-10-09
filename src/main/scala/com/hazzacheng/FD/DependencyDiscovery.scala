@@ -40,7 +40,7 @@ object DependencyDiscovery {
         val ls = lhsAll.get(k).get
         val lsBV = sc.broadcast(ls)
         val failed = partitions.flatMap(p => checkDependencies(p, candidatesBV, lsBV)).distinct().collect()
-//        val failed = sc.parallelize(ls).flatMap(lhs => checkDependencies(partitions, candidatesBV, lhs)).collect()
+//      val failed = sc.parallelize(ls).flatMap(lhs => checkDependencies(partitions, candidatesBV, lhs)).collect()
         cutLeaves(dependencies, candidates, failed, i)
         results ++= candidates
       }
