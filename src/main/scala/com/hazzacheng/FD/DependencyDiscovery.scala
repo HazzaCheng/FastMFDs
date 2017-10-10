@@ -3,9 +3,7 @@ package com.hazzacheng.FD
 import org.apache.spark.SparkContext
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.rdd.RDD
-import FDUtils.getSubsets
 
-import scala.collection.immutable.HashMap
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 
@@ -32,7 +30,7 @@ object DependencyDiscovery {
       val candidates = FDUtils.getCandidateDependencies(dependencies, i)
       val lhsAll = candidates.keySet.toList.groupBy(_.size)
       val keys = lhsAll.keys.toList.sortWith((x, y) => x > y)
-      val partitions = repart(sc, rdd, i)
+      val partitions = repart(sc, rdd, i).persist()
       if (partitions.count() == 1) emptyFD += i
 
       for (k <- keys) {
@@ -107,9 +105,11 @@ object DependencyDiscovery {
     val keys = fd.keySet.toList.sortWith((x,y) => x.size < y.size)
     for(k1 <- keys){
       for(k2 <- keys){
-        if(FDUtils.isSubset(k1,k2) && (fd(k1) & fd(k2)).nonEmpty){
-          fd(k2) --= fd(k1) & fd(k2)
-          if(fd(k2).isEmpty) fd -= k2
+        if (fd.contains(k2) && fd.contains(k1)) {
+          if (FDUtils.isSubset(k1, k2) && (fd(k1) & fd(k2)).nonEmpty) {
+            fd(k2) --= fd(k1) & fd(k2)
+            if (fd(k2).isEmpty) fd -= k2
+          }
         }
       }
     }
