@@ -23,8 +23,8 @@ object FDUtils {
   }
 
   def outPutFormat(minFD: mutable.HashMap[Set[Int], mutable.Set[Int]]): List[String] = {
-    minFD.map(d => d._1.map(x => "column" + x).toList.sorted.mkString("[", ",", "]")
-    + ":" + d._2.map(x => "column" + x).toList.sorted.mkString(",")).toList
+    minFD.map(d => d._1.toList.sorted.map(x => "column" + x).mkString("[", ",", "]")
+    + ":" + d._2.toList.sorted.map(x => "column" + x).mkString(",")).toList
   }
 
   def getDependencies(num: Int): mutable.HashMap[Set[Int], mutable.Set[Int]]= {

@@ -40,9 +40,8 @@ object DependencyDiscovery {
         val failed = partitions.flatMap(p => checkDependencies(p, candidatesBV, lsBV)).distinct().collect()
 //        val failed = sc.parallelize(ls).flatMap(lhs => checkDependencies(partitions, candidatesBV, lhs)).collect()
         cutLeaves(dependencies, candidates, failed, i)
-        results ++= candidates
       }
-
+      results ++= candidates
     }
     val minFD = DependencyDiscovery.findMinFD(results)
     if (emptyFD.size > 0) results += (Set.empty[Int] -> emptyFD)
