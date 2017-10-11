@@ -30,20 +30,25 @@ object DependencyDiscovery {
       val candidates = FDUtils.getCandidateDependencies(dependencies, i)
       val lhsAll = candidates.keySet.toList.groupBy(_.size)
       val keys = lhsAll.keys.toList.sortWith((x, y) => x > y)
-      val partitions = repart(sc, rdd, i).persist()
+      val partitions = repart(sc, rdd, i).cache()
       if (partitions.count() == 1) emptyFD += i
 
       for (k <- keys) {
         val candidatesBV = sc.broadcast(candidates)
         val ls = lhsAll.get(k).get
         val lsBV = sc.broadcast(ls)
-        val failed = partitions.flatMap(p => checkDependencies(p, candidatesBV, lsBV)).distinct().collect()
+        val failedTemp = partitions.flatMap(p => checkDependencies(p, candidatesBV, lsBV)).collect()
+        val failed = failedTemp.distinct
 //        val failed = sc.parallelize(ls).flatMap(lhs => checkDependencies(partitions, candidatesBV, lhs)).collect()
         cutLeaves(dependencies, candidates, failed, i)
       }
+      partitions.unpersist()
       results ++= candidates
     }
+    println("===========Start Find FD=============")
+    val time1 = System.currentTimeMillis()
     val minFD = DependencyDiscovery.findMinFD(results)
+    println("===========Use Time=============" + (System.currentTimeMillis() - time1))
     if (emptyFD.size > 0) results += (Set.empty[Int] -> emptyFD)
 
     minFD
