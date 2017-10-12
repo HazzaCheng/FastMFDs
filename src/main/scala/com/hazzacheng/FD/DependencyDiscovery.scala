@@ -19,8 +19,9 @@ import scala.collection.mutable.ListBuffer
 
 object DependencyDiscovery {
   private val parallelScaleFactor = 4
+  var time1 = System.currentTimeMillis()
 
-  def findOnSpark(sc: SparkContext, rdd: RDD[Array[String]]): mutable.HashMap[Set[Int], mutable.Set[Int]] = {
+  def findOnSpark(sc: SparkContext, rdd: RDD[Array[String]]): Map[Set[Int], mutable.Set[Int]] = {
     val nums = rdd.first().length
     val dependencies = FDUtils.getDependencies(nums)
     val emptyFD = mutable.Set.empty[Int]
@@ -31,24 +32,33 @@ object DependencyDiscovery {
       val lhsAll = candidates.keySet.toList.groupBy(_.size)
       val keys = lhsAll.keys.toList.sortWith((x, y) => x > y)
       val partitions = repart(sc, rdd, i).cache()
+      println("===========Partitions Size ============= Total" + partitions.count())
+      partitions.map(p => p.length).collect().foreach(println)
+      time1 = System.currentTimeMillis()
       if (partitions.count() == 1) emptyFD += i
+      println("===========Partitions count Use Time=============" + (System.currentTimeMillis() - time1))
+
 
       for (k <- keys) {
         val candidatesBV = sc.broadcast(candidates)
         val ls = lhsAll.get(k).get
         val lsBV = sc.broadcast(ls)
         val failedTemp = partitions.flatMap(p => checkDependencies(p, candidatesBV, lsBV)).collect()
+        time1 = System.currentTimeMillis()
         val failed = failedTemp.distinct
-//        val failed = sc.parallelize(ls).flatMap(lhs => checkDependencies(partitions, candidatesBV, lhs)).collect()
+        println("===========Distinct" + k + " Use Time=============" + (System.currentTimeMillis() - time1))
+        //        val failed = sc.parallelize(ls).flatMap(lhs => checkDependencies(partitions, candidatesBV, lhs)).collect()
+        time1 = System.currentTimeMillis()
         cutLeaves(dependencies, candidates, failed, i)
+        println("===========Cut Leaves" + k + " Use Time=============" + (System.currentTimeMillis() - time1))
       }
       partitions.unpersist()
       results ++= candidates
     }
-    println("===========Start Find FD=============")
-    val time1 = System.currentTimeMillis()
-    val minFD = DependencyDiscovery.findMinFD(results)
-    println("===========Use Time=============" + (System.currentTimeMillis() - time1))
+
+    time1 = System.currentTimeMillis()
+    val minFD = DependencyDiscovery.findMinFD(sc, results)
+    println("===========FindMinFD Use Time=============" + (System.currentTimeMillis() - time1))
     if (emptyFD.size > 0) results += (Set.empty[Int] -> emptyFD)
 
     minFD
@@ -76,6 +86,7 @@ object DependencyDiscovery {
   def checkDependencies(p: List[Array[String]],
                         candidatesBV: Broadcast[mutable.HashMap[Set[Int], mutable.Set[Int]]],
                         lsBV: Broadcast[List[Set[Int]]]): List[(Set[Int], Int)] = {
+    println("===========My Size=============" + p.length)
     val failed = new ListBuffer[(Set[Int], Int)]()
     for (lhs <- lsBV.value) {
       val existed = candidatesBV.value.get(lhs)
@@ -103,22 +114,27 @@ object DependencyDiscovery {
 
   }
 
+  def findMinFD(sc:SparkContext,
+                fd:mutable.HashMap[Set[Int], mutable.Set[Int]]):  Map[Set[Int], mutable.Set[Int]] = {
+    val fdList = fd.toList
+    val data = fdList.groupBy(_._1.size).map(f => (f._1, f._2.toMap))
+    val index = data.keys.toList.sortWith((x, y) => x < y)
+    val dataBV = sc.broadcast(data)
+    val indexBV = sc.broadcast(index)
+    val rdd = sc.parallelize(fdList.map(f => (f._1.size, f)), sc.defaultParallelism * parallelScaleFactor)
+    val minFD = rdd.map(f => getMinFD(dataBV, f, indexBV)).filter(_._2.size > 0).collect()
 
-  def findMinFD(fd :mutable.HashMap[Set[Int], mutable.Set[Int]]): mutable.HashMap[Set[Int], mutable.Set[Int]] = {
-    val minFD = mutable.HashMap.empty[Set[Int], mutable.Set[Int]]
-    val keys = fd.keySet.toList.sortWith((x,y) => x.size < y.size)
-    for(k1 <- keys){
-      for(k2 <- keys){
-        if (fd.contains(k2) && fd.contains(k1)) {
-          if (FDUtils.isSubset(k1, k2) && (fd(k1) & fd(k2)).nonEmpty) {
-            fd(k2) --= fd(k1) & fd(k2)
-            if (fd(k2).isEmpty) fd -= k2
-          }
-        }
-      }
+    minFD.toMap
+  }
+
+  def getMinFD(dataBV: Broadcast[Map[Int, Map[Set[Int], mutable.Set[Int]]]],
+               f:(Int, (Set[Int], mutable.Set[Int])), index:Broadcast[List[Int]]): (Set[Int], mutable.Set[Int]) = {
+    for(i <- index.value){
+      if(i >= f._1) f._2
+      for(fd <- dataBV.value(i))
+        if(FDUtils.isSubset(fd._1, f._2._1)) f._2._2 --= fd._2
     }
-
-    fd
+    f._2
   }
 
 }

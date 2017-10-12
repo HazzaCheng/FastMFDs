@@ -22,7 +22,7 @@ object FDUtils {
       .map(line => line.split(",").map(word => word.trim()))
   }
 
-  def outPutFormat(minFD: mutable.HashMap[Set[Int], mutable.Set[Int]]): List[String] = {
+  def outPutFormat(minFD: Map[Set[Int], mutable.Set[Int]]): List[String] = {
     minFD.map(d => d._1.toList.sorted.map(x => "column" + x).mkString("[", ",", "]")
     + ":" + d._2.toList.sorted.map(x => "column" + x).mkString(",")).toList
   }
@@ -111,5 +111,6 @@ object FDUtils {
       else false
     }
   }
+
 
 }

@@ -91,7 +91,7 @@ class FDUtilsTest extends FunSuite {
     fdMin += (Set.empty[Int] -> mutable.Set[Int](1, 2, 3))
     fdMin += (Set(1, 2) -> mutable.Set[Int](4, 5))
 
-    val str = FDUtils.outPutFormat(fdMin)
+    val str = FDUtils.outPutFormat(fdMin.toMap)
 //    str.foreach(println)
     assert(str.apply(0) === "[column1,column2]:column4,column5")
     assert(str.apply(1) === "[]:column1,column2,column3")
