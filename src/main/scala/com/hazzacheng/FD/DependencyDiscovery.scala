@@ -130,7 +130,7 @@ object DependencyDiscovery {
   def getMinFD(dataBV: Broadcast[Map[Int, Map[Set[Int], mutable.Set[Int]]]],
                f:(Int, (Set[Int], mutable.Set[Int])), index:Broadcast[List[Int]]): (Set[Int], mutable.Set[Int]) = {
     for(i <- index.value){
-      if(i >= f._1) f._2
+      if(i >= f._1) return f._2
       for(fd <- dataBV.value(i))
         if(FDUtils.isSubset(fd._1, f._2._1)) f._2._2 --= fd._2
     }
