@@ -20,23 +20,26 @@ import scala.collection.mutable.ListBuffer
 object DependencyDiscovery {
   private val parallelScaleFactor = 4
   var time1 = System.currentTimeMillis()
+  var time2 = System.currentTimeMillis()
 
   def findOnSpark(sc: SparkContext, rdd: RDD[Array[String]]): Map[Set[Int], mutable.Set[Int]] = {
     val nums = rdd.first().length
     val dependencies = FDUtils.getDependencies(nums)
     val emptyFD = mutable.Set.empty[Int]
     val results = mutable.HashMap.empty[Set[Int], mutable.Set[Int]]
-
-    for (i <- 1 to nums) {
+    val nums1 = Array(2, 4, 3, 6, 7, 5, 8, 10, 9, 1)
+    for (i <- nums1) {
+      time2 = System.currentTimeMillis()
       val candidates = FDUtils.getCandidateDependencies(dependencies, i)
       val lhsAll = candidates.keySet.toList.groupBy(_.size)
       val keys = lhsAll.keys.toList.sortWith((x, y) => x > y)
       val partitions = repart(sc, rdd, i).cache()
-      println("===========Partitions Size ============= Total" + partitions.count())
-      partitions.map(p => p.length).collect().foreach(println)
+      println("===========Partitioner=============" + partitions.partitioner)
+      println("===========Partitions " + i + " Size ============= Total" + partitions.count())
+      partitions.map(p => p.length).collect().foreach(x => println("Size for " + i + " " + x))
       time1 = System.currentTimeMillis()
       if (partitions.count() == 1) emptyFD += i
-      println("===========Partitions count Use Time=============" + (System.currentTimeMillis() - time1))
+      println("===========Partitions " + i + "count Use Time=============" + (System.currentTimeMillis() - time1))
 
 
       for (k <- keys) {
@@ -54,6 +57,7 @@ object DependencyDiscovery {
       }
       partitions.unpersist()
       results ++= candidates
+      println("===========Common Attr" + i + " Use Time=============" + (System.currentTimeMillis() - time2))
     }
 
     time1 = System.currentTimeMillis()
