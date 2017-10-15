@@ -49,11 +49,11 @@ object DependencyDiscovery {
         val failedTemp = partitions.flatMap(p => checkDependencies(p, candidatesBV, lsBV)).collect()
         time1 = System.currentTimeMillis()
         val failed = failedTemp.distinct
-        println("===========Distinct" + k + " Use Time=============" + (System.currentTimeMillis() - time1))
+        println("===========Distinct" + k + " Use Time=============" + System.currentTimeMillis() + " " + time1 + " " +(System.currentTimeMillis() - time1))
         //        val failed = sc.parallelize(ls).flatMap(lhs => checkDependencies(partitions, candidatesBV, lhs)).collect()
         time1 = System.currentTimeMillis()
         cutLeaves(dependencies, candidates, failed, i)
-        println("===========Cut Leaves" + k + " Use Time=============" + (System.currentTimeMillis() - time1))
+        println("===========Cut Leaves" + k + " Use Time=============" + System.currentTimeMillis() + " " + time1 + " " + (System.currentTimeMillis() - time1))
       }
       partitions.unpersist()
       results ++= candidates
@@ -62,7 +62,7 @@ object DependencyDiscovery {
 
     time1 = System.currentTimeMillis()
     val minFD = DependencyDiscovery.findMinFD(sc, results)
-    println("===========FindMinFD Use Time=============" + (System.currentTimeMillis() - time1))
+    println("===========FindMinFD Use Time=============" + System.currentTimeMillis() + " " + time1 + " " +(System.currentTimeMillis() - time1))
     if (emptyFD.size > 0) results += (Set.empty[Int] -> emptyFD)
 
     minFD
