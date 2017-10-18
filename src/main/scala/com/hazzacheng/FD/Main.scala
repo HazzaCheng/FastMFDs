@@ -17,7 +17,6 @@ object Main {
     val sc = new SparkContext()
     val input = args(0)
     val output = args(1)
-
     val rdd = FDUtils.readAsRdd(sc, input)
     val res = DependencyDiscovery.findOnSpark(sc, rdd)
     val fdMin = FDUtils.outPutFormat(res)

@@ -79,11 +79,11 @@ class FDUtilsTest extends FunSuite {
   }
 
   test("check"){
-    val l = List(Array("a","d","k","u"),Array("a","d","e","u"),Array("a","l","e","b"),
-      Array("a","l","e","b"),Array("a","r","m","q"))
+    val l = List(Array("a","d","k","u"),Array("a","f","e","u"),Array("a","l","e","b"),
+      Array("a","l","e","c"),Array("a","r","m","q"))
 
-    assert(FDUtils.check(l,List(1),List(4,3)).toArray.apply(0) === 4)
-    assert(FDUtils.check(l,List(1),List(4,3)).toArray.apply(1) === 3)
+    println(FDUtils.check(l, List(1,2), List(3,4)).size)
+
   }
 
   test("output") {
@@ -95,5 +95,15 @@ class FDUtilsTest extends FunSuite {
 //    str.foreach(println)
     assert(str.apply(0) === "[column1,column2]:column4,column5")
     assert(str.apply(1) === "[]:column1,column2,column3")
+  }
+
+  test("HashMap"){
+    val data = mutable.HashMap.empty[Set[Int], (mutable.Set[Int], mutable.HashMap[String,Array[String]])]
+    data.put(Set(1,2),mutable.Set(4,3) -> mutable.HashMap.empty[String,Array[String]])
+    data.put(Set(1,3),mutable.Set(5,6) -> mutable.HashMap.empty[String,Array[String]])
+    val rTuple = data(Set(1,2))
+    val r = rTuple._1
+    r -= 3
+    println(data(Set(1,2))._1.size)
   }
 }

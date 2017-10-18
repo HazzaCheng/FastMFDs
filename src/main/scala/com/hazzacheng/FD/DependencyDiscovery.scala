@@ -27,8 +27,8 @@ object DependencyDiscovery {
     val dependencies = FDUtils.getDependencies(nums)
     val emptyFD = mutable.Set.empty[Int]
     val results = mutable.HashMap.empty[Set[Int], mutable.Set[Int]]
-    val nums1 = Array(2, 4, 3, 6, 7, 5, 8, 10, 9, 1)
-    for (i <- nums1) {
+    //val nums1 = Array(2, 4, 3, 6, 7, 5, 8, 10, 9, 1)
+    for (i <- 1 to nums) {
       time2 = System.currentTimeMillis()
       val candidates = FDUtils.getCandidateDependencies(dependencies, i)
       val lhsAll = candidates.keySet.toList.groupBy(_.size)
@@ -72,8 +72,13 @@ object DependencyDiscovery {
     val partitions = rdd.map(line => (line(attribute - 1), List(line)))
       .reduceByKey(_ ++ _).map(t => t._2).repartition(sc.defaultParallelism * parallelScaleFactor)
 
+//    val partitions = rdd.map(line => (line(attribute - 1), List(line)))
+//      .reduceByKey(_ ++ _).values.flatMap(list => )
+
+
     partitions
   }
+
 
 //  def checkDependencies(partitions: RDD[List[Array[String]]],
 //                        candidatesBV: Broadcast[mutable.HashMap[Set[Int], mutable.Set[Int]]],

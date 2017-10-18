@@ -69,4 +69,13 @@ class DependencyDiscoveryTest extends FunSuite {
 //
 //  }
 
+  test("tupedata"){
+    for(i <- 1 to 20000000){
+      for(j <- i to 2000){
+
+      }
+    }
+
+  }
+
 }
