@@ -108,7 +108,7 @@ object DependencyDiscovery {
 
   def checkDependency(p: List[Array[String]], fd: (Set[Int], Int), isWrong: Accumulator[Int]): Unit = {
     val dict = mutable.HashMap.empty[String, String]
-    p.foreach(d => if (isWrong.value == 0) FDUtils.check(d,fd._1.toList,fd._2,dict,isWrong))
+    p.foreach(d => if (isWrong.value == 0) check(d,fd._1.toList,fd._2,dict,isWrong))
   }
 
   def check(d:Array[String], lhs:List[Int], rhs:Int, dict:mutable.HashMap[String, String],isWrong: Accumulator[Int])={
