@@ -34,7 +34,7 @@ object DependencyDiscovery {
       val candidates = FDUtils.getCandidateDependencies(dependencies, i)
       val lhsAll = candidates.keySet.toList.groupBy(_.size)
       val keys = lhsAll.keys.toList.sortWith((x, y) => x > y)
-      val partitions = repart(sc, rdd, i).persist(StorageLevel.MEMORY_AND_DISK_SER)
+      val partitions = repart(sc, rdd, i).sortBy(_.size).persist(StorageLevel.MEMORY_AND_DISK_SER)
 //      println("===========Partitioner=============" + partitions.partitioner)
 //      println("===========Partitions " + i + " Size ============= Total" + partitions.count())
 //      partitions.map(p => p.length).collect().foreach(x => println("Size for " + i + " " + x))
@@ -55,13 +55,13 @@ object DependencyDiscovery {
             if (isWrong != 0) failed.append(fd)
           }
         }
-        val failedTemp = partitions.flatMap(p => checkDependencies(p, candidatesBV, lsBV)).collect()
+        //val failedTemp = partitions.flatMap(p => checkDependencies(p, candidatesBV, lsBV)).collect()
         time1 = System.currentTimeMillis()
         //val failed = failedTemp.distinct
         println("===========Distinct" + k + " Use Time=============" + System.currentTimeMillis() + " " + time1 + " " +(System.currentTimeMillis() - time1))
         //        val failed = sc.parallelize(ls).flatMap(lhs => checkDependencies(partitions, candidatesBV, lhs)).collect()
         time1 = System.currentTimeMillis()
-        cutLeaves(dependencies, candidates, failed, i)
+        cutLeaves(dependencies, candidates, failed.toList, i)
         println("===========Cut Leaves" + k + " Use Time=============" + System.currentTimeMillis() + " " + time1 + " " + (System.currentTimeMillis() - time1))
       }
       partitions.unpersist()
@@ -125,7 +125,7 @@ object DependencyDiscovery {
 
   def cutLeaves(dependencies: mutable.HashMap[Set[Int], mutable.Set[Int]],
                 candidates: mutable.HashMap[Set[Int], mutable.Set[Int]],
-                failed: Array[(Set[Int], Int)], commonAttr: Int) = {
+                failed: List[(Set[Int], Int)], commonAttr: Int) = {
     for (d <- failed) {
       val subSets = FDUtils.getSubsets(d._1.toArray)
       for (subSet <- subSets) {

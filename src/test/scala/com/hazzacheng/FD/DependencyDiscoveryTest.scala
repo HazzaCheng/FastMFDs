@@ -17,7 +17,7 @@ class DependencyDiscoveryTest extends FunSuite {
     val nums = 4
     val dependencies = FDUtils.getDependencies(nums)
     val candidates = FDUtils.getCandidateDependencies(dependencies, 1)
-    val failed = Array((Set(1, 3), 4), (Set(1, 3, 4), 2))
+    val failed = List((Set(1, 3), 4), (Set(1, 3, 4), 2))
 
     var size1 = 0
     var size2 = 0
