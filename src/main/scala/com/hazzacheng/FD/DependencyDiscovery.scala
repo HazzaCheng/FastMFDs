@@ -102,25 +102,26 @@ object DependencyDiscovery {
 //  }
 
   def checkDependency(p: List[Array[String]], fd: (Set[Int], Int), isWrong: Accumulator[Int]): Unit = {
-
+    val dict = mutable.HashMap.empty[String, String]
+    p.foreach(d => FDUtils.check(d,fd._1.toList,fd._2,dict,isWrong))
   }
 
-  def checkDependencies(p: List[Array[String]],
-                        candidatesBV: Broadcast[mutable.HashMap[Set[Int], mutable.Set[Int]]],
-                        lsBV: Broadcast[List[Set[Int]]]): List[(Set[Int], Int)] = {
-    println("===========My Size=============" + p.length)
-    val failed = new ListBuffer[(Set[Int], Int)]()
-    for (lhs <- lsBV.value) {
-      val existed = candidatesBV.value.get(lhs)
-      if (existed != None) {
-        val rs = existed.get.toList
-        val fail = FDUtils.check(p, lhs.toList, rs).map(rhs => (lhs, rhs))
-        failed ++= fail
-      }
-    }
-
-    failed.toList
-  }
+//  def checkDependencies(p: List[Array[String]],
+//                        candidatesBV: Broadcast[mutable.HashMap[Set[Int], mutable.Set[Int]]],
+//                        lsBV: Broadcast[List[Set[Int]]]): List[(Set[Int], Int)] = {
+//    println("===========My Size=============" + p.length)
+//    val failed = new ListBuffer[(Set[Int], Int)]()
+//    for (lhs <- lsBV.value) {
+//      val existed = candidatesBV.value.get(lhs)
+//      if (existed != None) {
+//        val rs = existed.get.toList
+//        val fail = FDUtils.check(p, lhs.toList, rs).map(rhs => (lhs, rhs))
+//        failed ++= fail
+//      }
+//    }
+//
+//    failed.toList
+//  }
 
 
   def cutLeaves(dependencies: mutable.HashMap[Set[Int], mutable.Set[Int]],

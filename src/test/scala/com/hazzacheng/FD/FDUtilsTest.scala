@@ -78,13 +78,13 @@ class FDUtilsTest extends FunSuite {
     assert(size3 === num * (1 << num - 1) - num - size2 - size4)
   }
 
-  test("check"){
-    val l = List(Array("a","d","k","u"),Array("a","f","e","u"),Array("a","l","e","b"),
-      Array("a","l","e","c"),Array("a","r","m","q"))
-
-    println(FDUtils.check(l, List(1,2), List(3,4)).size)
-
-  }
+//  test("check"){
+//    val l = List(Array("a","d","k","u"),Array("a","f","e","u"),Array("a","l","e","b"),
+//      Array("a","l","e","c"),Array("a","r","m","q"))
+//
+//    println(FDUtils.check(l, List(1,2), List(3,4)).size)
+//
+//  }
 
   test("output") {
     val fdMin = mutable.HashMap.empty[Set[Int], mutable.Set[Int]]
@@ -106,4 +106,5 @@ class FDUtilsTest extends FunSuite {
     r -= 3
     println(data(Set(1,2))._1.size)
   }
+
 }

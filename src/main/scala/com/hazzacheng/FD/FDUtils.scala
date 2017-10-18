@@ -1,6 +1,6 @@
 package com.hazzacheng.FD
 
-import org.apache.spark.SparkContext
+import org.apache.spark.{Accumulator, SparkContext}
 import org.apache.spark.rdd.RDD
 
 import scala.collection.mutable
@@ -78,33 +78,50 @@ object FDUtils {
     s.toString()
   }
 
-  def takeAttrRHS(arr: Array[String], attributes: List[Int]): Array[String] = {
-    val res = new Array[String](16)
-    attributes.foreach(attr => res(attr) = arr(attr - 1))
-    res
+//  def takeAttrRHS(arr: Array[String], attributes: List[Int]): Array[String] = {
+//    val res = new Array[String](16)
+//    attributes.foreach(attr => res(attr) = arr(attr - 1))
+//    res
+//  }
+
+  def takeAttrRHS(arr: Array[String], attributes: Int): String = {
+    arr(attributes - 1)
   }
 
-  def check(data: List[Array[String]], lhs: List[Int], rhs: List[Int]): List[Int] ={
-    //val lSize = data.map(d => (FDUtils.takeAttributes(d, lhs),d)).groupBy(_._1).size
-    val res = mutable.Set.empty[Int]
-    var true_rhs = rhs.toSet
-    val dict = mutable.HashMap.empty[String, Array[String]]
-    data.foreach(d => {
+  def check(d:Array[String], lhs:List[Int], rhs:Int, dict:mutable.HashMap[String, String],isWrong: Accumulator[Int])={
+    if(isWrong.value == 0){
       val left = takeAttrLHS(d, lhs)
       val right = takeAttrRHS(d, rhs)
       if(dict.contains(left)){
-        for(i <- true_rhs){
-          if(!dict(left)(i).equals(right(i))){
-            true_rhs -= i
-            res += i
-          }
+        if(!dict(left).equals(right)){
+          isWrong += 1
         }
       }
       else dict += left -> right
-    })
-
-    res.toList
+    }
   }
+
+//  def check(data: List[Array[String]], lhs: List[Int], rhs: List[Int]): List[Int] ={
+//    //val lSize = data.map(d => (FDUtils.takeAttributes(d, lhs),d)).groupBy(_._1).size
+//    val res = mutable.Set.empty[Int]
+//    var true_rhs = rhs.toSet
+//    val dict = mutable.HashMap.empty[String, Array[String]]
+//    data.foreach(d => {
+//      val left = takeAttrLHS(d, lhs)
+//      val right = takeAttrRHS(d, rhs)
+//      if(dict.contains(left)){
+//        for(i <- true_rhs){
+//          if(!dict(left)(i).equals(right(i))){
+//            true_rhs -= i
+//            res += i
+//          }
+//        }
+//      }
+//      else dict += left -> right
+//    })
+//
+//    res.toList
+//  }
 
   def cut(map: mutable.HashMap[Set[Int], mutable.Set[Int]],
           lhs: Set[Int], rhs: Int) = {

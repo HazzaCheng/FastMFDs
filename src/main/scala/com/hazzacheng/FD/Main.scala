@@ -15,6 +15,7 @@ object Main {
 
   def main(args: Array[String]): Unit = {
     val sc = new SparkContext()
+
     val input = args(0)
     val output = args(1)
     val rdd = FDUtils.readAsRdd(sc, input)
