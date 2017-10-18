@@ -48,9 +48,9 @@ object DependencyDiscovery {
         val failed: ListBuffer[(Set[Int], Int)] = ListBuffer.empty
         //val lsBV = sc.broadcast(ls)
         for (lhs <- ls) {
-          val rhss = candidates.get(lhs).get
-          if (rhss != None) {
-            for (rhs <- rhss.toList) {
+          val rhss = candidates.get(lhs)
+          if (rhss.get != None) {
+            for (rhs <- rhss.get.toList) {
               val isWrong = sc.accumulator(0)
               val fd = (lhs, rhs)
               partitions.foreach(p => if (isWrong == 0) checkDependency(p, fd, isWrong))
