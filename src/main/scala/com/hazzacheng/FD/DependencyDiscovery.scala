@@ -55,7 +55,7 @@ object DependencyDiscovery {
               val isWrong = sc.accumulator(0)
               val fd = (lhs, rhs)
               partitions.foreach(p => if (isWrong.value == 0) checkDependency(p, fd, isWrong))
-              if (isWrong != 0) failed.append(fd)
+              if (isWrong.value != 0) failed.append(fd)
             }
           }
 
