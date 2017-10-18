@@ -48,12 +48,16 @@ object DependencyDiscovery {
         val failed: ListBuffer[(Set[Int], Int)] = ListBuffer.empty
         //val lsBV = sc.broadcast(ls)
         for (lhs <- ls) {
-          for (rhs <- candidates.get(lhs).get.toList) {
-            val isWrong = sc.accumulator(0)
-            val fd = (lhs, rhs)
-            partitions.foreach(p => if (isWrong == 0) checkDependency(p, fd, isWrong))
-            if (isWrong != 0) failed.append(fd)
+          val rhss = candidates.get(lhs).get
+          if (rhss != None) {
+            for (rhs <- rhss.toList) {
+              val isWrong = sc.accumulator(0)
+              val fd = (lhs, rhs)
+              partitions.foreach(p => if (isWrong == 0) checkDependency(p, fd, isWrong))
+              if (isWrong != 0) failed.append(fd)
+            }
           }
+
         }
         //val failedTemp = partitions.flatMap(p => checkDependencies(p, candidatesBV, lsBV)).collect()
         time1 = System.currentTimeMillis()
