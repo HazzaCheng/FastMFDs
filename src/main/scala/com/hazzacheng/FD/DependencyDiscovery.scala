@@ -1,8 +1,9 @@
 package com.hazzacheng.FD
 
-import org.apache.spark.SparkContext
+import org.apache.spark.{Accumulator, SparkContext}
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.rdd.RDD
+import org.apache.spark.storage.StorageLevel
 
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
@@ -27,28 +28,36 @@ object DependencyDiscovery {
     val dependencies = FDUtils.getDependencies(nums)
     val emptyFD = mutable.Set.empty[Int]
     val results = mutable.HashMap.empty[Set[Int], mutable.Set[Int]]
-    //val nums1 = Array(2, 4, 3, 6, 7, 5, 8, 10, 9, 1)
+    val nums1 = Array(2, 4, 3, 6, 7, 5, 8, 10, 9, 1)
     for (i <- 1 to nums) {
       time2 = System.currentTimeMillis()
       val candidates = FDUtils.getCandidateDependencies(dependencies, i)
       val lhsAll = candidates.keySet.toList.groupBy(_.size)
       val keys = lhsAll.keys.toList.sortWith((x, y) => x > y)
-      val partitions = repart(sc, rdd, i).cache()
-      println("===========Partitioner=============" + partitions.partitioner)
-      println("===========Partitions " + i + " Size ============= Total" + partitions.count())
-      partitions.map(p => p.length).collect().foreach(x => println("Size for " + i + " " + x))
+      val partitions = repart(sc, rdd, i).persist(StorageLevel.MEMORY_AND_DISK_SER)
+//      println("===========Partitioner=============" + partitions.partitioner)
+//      println("===========Partitions " + i + " Size ============= Total" + partitions.count())
+//      partitions.map(p => p.length).collect().foreach(x => println("Size for " + i + " " + x))
       time1 = System.currentTimeMillis()
       if (partitions.count() == 1) emptyFD += i
       println("===========Partitions " + i + "count Use Time=============" + (System.currentTimeMillis() - time1))
 
 
       for (k <- keys) {
-        val candidatesBV = sc.broadcast(candidates)
         val ls = lhsAll.get(k).get
-        val lsBV = sc.broadcast(ls)
+        val failed: ListBuffer[(Set[Int], Int)] = ListBuffer.empty
+        //val lsBV = sc.broadcast(ls)
+        for (lhs <- ls) {
+          for (rhs <- candidates.get(lhs).get.toList) {
+            val isWrong = sc.accumulator(0)
+            val fd = (lhs, rhs)
+            partitions.foreach(p => if (isWrong == 0) checkDependency(p, fd, isWrong))
+            if (isWrong != 0) failed.append(fd)
+          }
+        }
         val failedTemp = partitions.flatMap(p => checkDependencies(p, candidatesBV, lsBV)).collect()
         time1 = System.currentTimeMillis()
-        val failed = failedTemp.distinct
+        //val failed = failedTemp.distinct
         println("===========Distinct" + k + " Use Time=============" + System.currentTimeMillis() + " " + time1 + " " +(System.currentTimeMillis() - time1))
         //        val failed = sc.parallelize(ls).flatMap(lhs => checkDependencies(partitions, candidatesBV, lhs)).collect()
         time1 = System.currentTimeMillis()
@@ -91,6 +100,10 @@ object DependencyDiscovery {
 //      failed.collect()
 //    } else Array()
 //  }
+
+  def checkDependency(p: List[Array[String]], fd: (Set[Int], Int), isWrong: Accumulator[Int]): Unit = {
+
+  }
 
   def checkDependencies(p: List[Array[String]],
                         candidatesBV: Broadcast[mutable.HashMap[Set[Int], mutable.Set[Int]]],
