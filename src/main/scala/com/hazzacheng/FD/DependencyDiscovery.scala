@@ -1,5 +1,6 @@
 package com.hazzacheng.FD
 
+import com.hazzacheng.FD.FDUtils.{takeAttrLHS, takeAttrRHS}
 import org.apache.spark.{Accumulator, SparkContext}
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.rdd.RDD
@@ -53,7 +54,7 @@ object DependencyDiscovery {
             for (rhs <- rhss.get.toList) {
               val isWrong = sc.accumulator(0)
               val fd = (lhs, rhs)
-              partitions.foreach(p => if (isWrong == 0) checkDependency(p, fd, isWrong))
+              partitions.foreach(p => if (isWrong.value == 0) checkDependency(p, fd, isWrong))
               if (isWrong != 0) failed.append(fd)
             }
           }
@@ -107,7 +108,20 @@ object DependencyDiscovery {
 
   def checkDependency(p: List[Array[String]], fd: (Set[Int], Int), isWrong: Accumulator[Int]): Unit = {
     val dict = mutable.HashMap.empty[String, String]
-    p.foreach(d => FDUtils.check(d,fd._1.toList,fd._2,dict,isWrong))
+    p.foreach(d => if (isWrong.value == 0) FDUtils.check(d,fd._1.toList,fd._2,dict,isWrong))
+  }
+
+  def check(d:Array[String], lhs:List[Int], rhs:Int, dict:mutable.HashMap[String, String],isWrong: Accumulator[Int])={
+
+    val left = takeAttrLHS(d, lhs)
+    val right = takeAttrRHS(d, rhs)
+    if(dict.contains(left)){
+      if(!dict(left).equals(right)){
+        isWrong.add(1)
+      }
+    }
+    else dict += left -> right
+
   }
 
 //  def checkDependencies(p: List[Array[String]],

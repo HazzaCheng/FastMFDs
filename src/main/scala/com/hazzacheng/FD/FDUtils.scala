@@ -88,18 +88,7 @@ object FDUtils {
     arr(attributes - 1)
   }
 
-  def check(d:Array[String], lhs:List[Int], rhs:Int, dict:mutable.HashMap[String, String],isWrong: Accumulator[Int])={
-    if(isWrong.value == 0){
-      val left = takeAttrLHS(d, lhs)
-      val right = takeAttrRHS(d, rhs)
-      if(dict.contains(left)){
-        if(!dict(left).equals(right)){
-          isWrong += 1
-        }
-      }
-      else dict += left -> right
-    }
-  }
+
 
 //  def check(data: List[Array[String]], lhs: List[Int], rhs: List[Int]): List[Int] ={
 //    //val lSize = data.map(d => (FDUtils.takeAttributes(d, lhs),d)).groupBy(_._1).size
