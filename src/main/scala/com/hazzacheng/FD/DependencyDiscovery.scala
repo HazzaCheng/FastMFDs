@@ -49,7 +49,7 @@ object DependencyDiscovery {
         //val lsBV = sc.broadcast(ls)
         for (lhs <- ls) {
           val rhss = candidates.get(lhs)
-          if (rhss.get != None) {
+          if (rhss != None) {
             for (rhs <- rhss.get.toList) {
               val isWrong = sc.accumulator(0)
               val fd = (lhs, rhs)
