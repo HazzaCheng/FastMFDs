@@ -48,10 +48,15 @@ object DependencyDiscovery {
         val fds = FDUtils.getLevelFD(candidates, ls)
         val failed: ListBuffer[(Set[Int], Int)] = ListBuffer.empty
         for (partition <- partitions) {
-          val partitionBV = sc.broadcast(partition)
-          val failFD = sc.parallelize(fds).filter(fd => !checkDependency(partitionBV, fd)).collect()
-          fds --= failFD
-          partitionBV.unpersist()   //pay attention
+          println("=====================My Partition Size============" + partition.size)
+          if (fds.nonEmpty) {
+            val partitionBV = sc.broadcast(partition)
+            val failFD = sc.parallelize(fds).filter(fd => !checkDependency(partitionBV, fd)).collect()
+            println("=====FD SIZE====" + fds.length + "=====FAILED SIZE=====" + failFD.size)
+            failFD.foreach(println)
+            fds --= failFD
+            partitionBV.unpersist() //pay attention
+          }
         }
 
         time1 = System.currentTimeMillis()
