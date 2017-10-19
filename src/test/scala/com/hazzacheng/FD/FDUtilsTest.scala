@@ -97,7 +97,7 @@ class FDUtilsTest extends FunSuite {
     assert(str.apply(1) === "[]:column1,column2,column3")
   }
 
-  test("HashMap"){
+  test("HashMap") {
     val data = mutable.HashMap.empty[Set[Int], (mutable.Set[Int], mutable.HashMap[String,Array[String]])]
     data.put(Set(1,2),mutable.Set(4,3) -> mutable.HashMap.empty[String,Array[String]])
     data.put(Set(1,3),mutable.Set(5,6) -> mutable.HashMap.empty[String,Array[String]])
@@ -105,6 +105,20 @@ class FDUtilsTest extends FunSuite {
     val r = rTuple._1
     r -= 3
     println(data(Set(1,2))._1.size)
+  }
+
+  test("get level fd") {
+    val num = 15
+    val dependencies = FDUtils.getDependencies(num)
+    val candidates = FDUtils.getCandidateDependencies(dependencies, 1)
+    val lhsAll = candidates.keySet.toList.groupBy(_.size)
+    val keys = lhsAll.keys.toList.sortWith((x, y) => x > y)
+    for (key <- keys) {
+      val ls = lhsAll.get(key).get
+      val fd = FDUtils.getLevelFD(candidates, ls)
+      println("fd size: " + fd.length)
+    }
+    //fd.foreach(println)
   }
 
 }
