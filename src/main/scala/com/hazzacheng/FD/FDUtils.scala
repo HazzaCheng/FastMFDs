@@ -78,6 +78,16 @@ object FDUtils {
     s.toString()
   }
 
+  def getLevelFD(candidates: mutable.HashMap[Set[Int], mutable.Set[Int]],
+                 ls: List[Set[Int]]): ListBuffer[(Set[Int], Int)] = {
+    val fds = ListBuffer.empty[(Set[Int], Int)]
+    for (lhs <- ls) {
+      val rs = candidates.get(lhs)
+      if (rs.isDefined) rs.get.toList.foreach(rhs => fds.append((lhs, rhs)))
+    }
+    fds
+  }
+
 //  def takeAttrRHS(arr: Array[String], attributes: List[Int]): Array[String] = {
 //    val res = new Array[String](16)
 //    attributes.foreach(attr => res(attr) = arr(attr - 1))
@@ -115,7 +125,7 @@ object FDUtils {
   def cut(map: mutable.HashMap[Set[Int], mutable.Set[Int]],
           lhs: Set[Int], rhs: Int) = {
     val ot = map.get(lhs)
-    if (ot != None) {
+    if (ot.isDefined) {
       val v = ot.get
       if (v contains rhs) {
         if (v.size == 1) map -= lhs

@@ -35,32 +35,25 @@ object DependencyDiscovery {
       val candidates = FDUtils.getCandidateDependencies(dependencies, i)
       val lhsAll = candidates.keySet.toList.groupBy(_.size)
       val keys = lhsAll.keys.toList.sortWith((x, y) => x > y)
-      val partitions = repart(sc, rdd, i).sortBy(_.size).persist(StorageLevel.MEMORY_AND_DISK_SER)
+      val partitions = repart(sc, rdd, i).sortBy(_.size).collect()
 //      println("===========Partitioner=============" + partitions.partitioner)
 //      println("===========Partitions " + i + " Size ============= Total" + partitions.count())
 //      partitions.map(p => p.length).collect().foreach(x => println("Size for " + i + " " + x))
       time1 = System.currentTimeMillis()
-      if (partitions.count() == 1) emptyFD += i
+      if (partitions.length == 1) emptyFD += i
       println("===========Partitions " + i + "count Use Time=============" + (System.currentTimeMillis() - time1))
-
 
       for (k <- keys) {
         val ls = lhsAll.get(k).get
+        val fds = FDUtils.getLevelFD(candidates, ls)
         val failed: ListBuffer[(Set[Int], Int)] = ListBuffer.empty
-        //val lsBV = sc.broadcast(ls)
-        for (lhs <- ls) {
-          val rhss = candidates.get(lhs)
-          if (rhss != None) {
-            for (rhs <- rhss.get.toList) {
-              val isWrong = sc.accumulator(0)
-              val fd = (lhs, rhs)
-              partitions.foreach(p => if (isWrong.value == 0) checkDependency(p, fd, isWrong))
-              if (isWrong.value != 0) failed.append(fd)
-            }
-          }
-
+        for (partition <- partitions) {
+          val partitionBV = sc.broadcast(partition)
+          val failFD = sc.parallelize(fds).filter(fd => !checkDependency(partitionBV, fd)).collect()
+          fds --= failFD
+          partitionBV.unpersist()   //pay attention
         }
-        //val failedTemp = partitions.flatMap(p => checkDependencies(p, candidatesBV, lsBV)).collect()
+
         time1 = System.currentTimeMillis()
         //val failed = failedTemp.distinct
         println("===========Distinct" + k + " Use Time=============" + System.currentTimeMillis() + " " + time1 + " " +(System.currentTimeMillis() - time1))
@@ -69,7 +62,7 @@ object DependencyDiscovery {
         cutLeaves(dependencies, candidates, failed.toList, i)
         println("===========Cut Leaves" + k + " Use Time=============" + System.currentTimeMillis() + " " + time1 + " " + (System.currentTimeMillis() - time1))
       }
-      partitions.unpersist()
+//      partitions.unpersist()
       results ++= candidates
       println("===========Common Attr" + i + " Use Time=============" + (System.currentTimeMillis() - time2))
     }
@@ -86,27 +79,11 @@ object DependencyDiscovery {
     val partitions = rdd.map(line => (line(attribute - 1), List(line)))
       .reduceByKey(_ ++ _).map(t => t._2).repartition(sc.defaultParallelism * parallelScaleFactor)
 
-//    val partitions = rdd.map(line => (line(attribute - 1), List(line)))
-//      .reduceByKey(_ ++ _).values.flatMap(list => )
-
-
     partitions
   }
 
-
-//  def checkDependencies(partitions: RDD[List[Array[String]]],
-//                        candidatesBV: Broadcast[mutable.HashMap[Set[Int], mutable.Set[Int]]],
-//                        lhs: Set[Int]): Array[(Set[Int], Int)] = {
-//    val existed = candidatesBV.value.get(lhs)
-//    if (existed != None) {
-//      val rs = existed.get.toList
-//      val failed = partitions.flatMap(p => FDUtils.check(p, lhs.toList, rs))
-//        .distinct().map(rhs => (lhs, rhs))
-//      failed.collect()
-//    } else Array()
-//  }
-
-  def checkDependency(p: List[Array[String]], fd: (Set[Int], Int), isWrong: Accumulator[Int]): Unit = {
+  def checkDependency(partitionBV: Broadcast[List[Array[String]]],
+                      fd: (Set[Int], Int)): Boolean = {
     val dict = mutable.HashMap.empty[String, String]
     p.foreach(d => if (isWrong.value == 0) check(d,fd._1.toList,fd._2,dict,isWrong))
   }
