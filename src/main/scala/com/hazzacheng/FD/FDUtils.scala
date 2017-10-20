@@ -88,6 +88,22 @@ object FDUtils {
     fds
   }
 
+  def getSameLhsFD(candidates: mutable.HashMap[Set[Int], mutable.Set[Int]],
+                   ls: List[Set[Int]]): mutable.HashMap[Set[Int], mutable.Set[Int]] = {
+    val sameLHS = mutable.HashMap.empty[Set[Int], mutable.Set[Int]]
+    for (lhs <- ls) {
+      val rs = candidates(lhs)
+      if (lhs.nonEmpty) sameLHS.update(lhs, rs)
+    }
+    sameLHS
+  }
+
+  def cutInSameLhs(sameLHS: mutable.HashMap[Set[Int], mutable.Set[Int]],
+                   failFD: Array[(Set[Int], Int)]): mutable.HashMap[Set[Int], mutable.Set[Int]] = {
+    failFD.foreach(fd => cut(sameLHS, fd._1, fd._2))
+    sameLHS
+  }
+
 //  def takeAttrRHS(arr: Array[String], attributes: List[Int]): Array[String] = {
 //    val res = new Array[String](16)
 //    attributes.foreach(attr => res(attr) = arr(attr - 1))

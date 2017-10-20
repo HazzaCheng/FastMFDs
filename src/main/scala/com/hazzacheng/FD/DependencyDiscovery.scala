@@ -29,32 +29,47 @@ object DependencyDiscovery {
     val dependencies = FDUtils.getDependencies(nums)
     val emptyFD = mutable.Set.empty[Int]
     val results = mutable.HashMap.empty[Set[Int], mutable.Set[Int]]
-    val nums1 = Array(2, 4, 3, 6, 7, 5, 8, 10, 9, 1)
+    //val nums1 = Array(2, 4, 3, 6, 7, 5, 8, 10, 9, 1)
     for (i <- 1 to nums) {
       time2 = System.currentTimeMillis()
       val candidates = FDUtils.getCandidateDependencies(dependencies, i)
       val lhsAll = candidates.keySet.toList.groupBy(_.size)
       val keys = lhsAll.keys.toList.sortWith((x, y) => x > y)
-      val partitions = repart(sc, rdd, i).sortBy(_.size).collect()
-//      println("===========Partitioner=============" + partitions.partitioner)
-//      println("===========Partitions " + i + " Size ============= Total" + partitions.count())
-//      partitions.map(p => p.length).collect().foreach(x => println("Size for " + i + " " + x))
+      time1 = System.currentTimeMillis()
+      val partitions = repart(sc, rdd, i).collect().sortBy(_.length)
+      println("===========Sort " + i + " Use Time=============" + (System.currentTimeMillis() - time1))
+      //      println("===========Partitioner=============" + partitions.partitioner)
+      //      println("===========Partitions " + i + " Size ============= Total" + partitions.count())
+      //      partitions.map(p => p.length).collect().foreach(x => println("Size for " + i + " " + x))
       time1 = System.currentTimeMillis()
       if (partitions.length == 1) emptyFD += i
       println("===========Partitions " + i + "count Use Time=============" + (System.currentTimeMillis() - time1))
 
       for (k <- keys) {
-        val ls = lhsAll.get(k).get
-        val fds = FDUtils.getLevelFD(candidates, ls)
+        val ls = lhsAll(k)
+        val fds = FDUtils.getSameLhsFD(candidates, ls)
+//        val fdsMap = fds.map(fd => fd->true).toMap
+//        val fdsRDD = sc.parallelize(fds, sc.defaultParallelism * parallelScaleFactor)
         val failed: ListBuffer[(Set[Int], Int)] = ListBuffer.empty
         for (partition <- partitions) {
           println("=====================My Partition Size============" + partition.size)
           if (fds.nonEmpty) {
             val partitionBV = sc.broadcast(partition)
-            val failFD = sc.parallelize(fds).filter(fd => !checkDependency(partitionBV, fd)).collect()
-            println("=====FD SIZE====" + fds.length + "=====FAILED SIZE=====" + failFD.size)
-            failFD.foreach(println)
-            fds --= failFD
+            val failFD = sc.parallelize(fds.toList)
+              .flatMap(fd => checkDependency(partitionBV, fd)).collect().distinct
+//            val fdsMapBV = sc.broadcast(fdsMap)
+            //            val failFD = fdsRDD.filter(fd =>
+            //              if (fdsMapBV.value.getOrElse(fd, false)) !checkDependency(partitionBV, fd)
+            //              else false).collect()
+//            val failFD = fdsRDD.filter(fd => fdsMapBV.value.getOrElse(fd, false)).
+//              filter(fd => !checkDependency(partitionBV, fd)).collect()
+//            failFD.foreach(fd => fdsMap.updated(fd, false))
+//            println("=====FD SIZE==== " + fds.length + "=====FAILED SIZE===== " + failFD.size)
+//            fds.foreach(x => println("FD: " + x))
+//            failFD.foreach(x => println("FAILED FD: " + x))
+            FDUtils.cutInSameLhs(fds, failFD)
+            failed ++= failFD
+//            fdsMapBV.unpersist()  // pay attention
             partitionBV.unpersist() //pay attention
           }
         }
@@ -67,7 +82,7 @@ object DependencyDiscovery {
         cutLeaves(dependencies, candidates, failed.toList, i)
         println("===========Cut Leaves" + k + " Use Time=============" + System.currentTimeMillis() + " " + time1 + " " + (System.currentTimeMillis() - time1))
       }
-//      partitions.unpersist()
+      //      partitions.unpersist()
       results ++= candidates
       println("===========Common Attr" + i + " Use Time=============" + (System.currentTimeMillis() - time2))
     }
@@ -75,20 +90,22 @@ object DependencyDiscovery {
     time1 = System.currentTimeMillis()
     val minFD = DependencyDiscovery.findMinFD(sc, results)
     println("===========FindMinFD Use Time=============" + System.currentTimeMillis() + " " + time1 + " " +(System.currentTimeMillis() - time1))
-    if (emptyFD.size > 0) results += (Set.empty[Int] -> emptyFD)
+    if (emptyFD.nonEmpty) results += (Set.empty[Int] -> emptyFD)
 
     minFD
   }
 
   def repart(sc: SparkContext, rdd: RDD[Array[String]], attribute: Int): RDD[List[Array[String]]] = {
     val partitions = rdd.map(line => (line(attribute - 1), List(line)))
-      .reduceByKey(_ ++ _).map(t => t._2).repartition(sc.defaultParallelism * parallelScaleFactor)
+      //.repartition(sc.defaultParallelism * parallelScaleFactor)
+      .reduceByKey(_ ++ _).map(t => t._2)//.repartition(sc.defaultParallelism * parallelScaleFactor)
+
 
     partitions
   }
 
   def checkDependency(partitionBV: Broadcast[List[Array[String]]],
-                      fd: (Set[Int], Int)): Boolean = {
+                      fd: (Set[Int], mutable.Set[Int])): List[(Set[Int], Int)] = {
     val dict = mutable.HashMap.empty[String, String]
     val lhs = fd._1.toList
     for(arr <- partitionBV.value){
@@ -117,22 +134,22 @@ object DependencyDiscovery {
 
   }
 
-//  def checkDependencies(p: List[Array[String]],
-//                        candidatesBV: Broadcast[mutable.HashMap[Set[Int], mutable.Set[Int]]],
-//                        lsBV: Broadcast[List[Set[Int]]]): List[(Set[Int], Int)] = {
-//    println("===========My Size=============" + p.length)
-//    val failed = new ListBuffer[(Set[Int], Int)]()
-//    for (lhs <- lsBV.value) {
-//      val existed = candidatesBV.value.get(lhs)
-//      if (existed != None) {
-//        val rs = existed.get.toList
-//        val fail = FDUtils.check(p, lhs.toList, rs).map(rhs => (lhs, rhs))
-//        failed ++= fail
-//      }
-//    }
-//
-//    failed.toList
-//  }
+  //  def checkDependencies(p: List[Array[String]],
+  //                        candidatesBV: Broadcast[mutable.HashMap[Set[Int], mutable.Set[Int]]],
+  //                        lsBV: Broadcast[List[Set[Int]]]): List[(Set[Int], Int)] = {
+  //    println("===========My Size=============" + p.length)
+  //    val failed = new ListBuffer[(Set[Int], Int)]()
+  //    for (lhs <- lsBV.value) {
+  //      val existed = candidatesBV.value.get(lhs)
+  //      if (existed != None) {
+  //        val rs = existed.get.toList
+  //        val fail = FDUtils.check(p, lhs.toList, rs).map(rhs => (lhs, rhs))
+  //        failed ++= fail
+  //      }
+  //    }
+  //
+  //    failed.toList
+  //  }
 
 
   def cutLeaves(dependencies: mutable.HashMap[Set[Int], mutable.Set[Int]],
