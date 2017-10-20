@@ -104,11 +104,11 @@ object FDUtils {
     sameLHS
   }
 
-//  def takeAttrRHS(arr: Array[String], attributes: List[Int]): Array[String] = {
-//    val res = new Array[String](16)
-//    attributes.foreach(attr => res(attr) = arr(attr - 1))
-//    res
-//  }
+  def takeAttrRHS(arr: Array[String], attributes: List[Int]): Array[String] = {
+    val res = new Array[String](16)
+    attributes.foreach(attr => res(attr) = arr(attr - 1))
+    res
+  }
 
   def takeAttrRHS(arr: Array[String], attributes: Int): String = {
     arr(attributes - 1)

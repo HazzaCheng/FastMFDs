@@ -106,19 +106,26 @@ object DependencyDiscovery {
 
   def checkDependency(partitionBV: Broadcast[List[Array[String]]],
                       fd: (Set[Int], mutable.Set[Int])): List[(Set[Int], Int)] = {
-    val dict = mutable.HashMap.empty[String, String]
+    val res = mutable.Set.empty[Int]
+    var true_rhs = fd._2.toSet
     val lhs = fd._1.toList
-    for(arr <- partitionBV.value){
-      val left = takeAttrLHS(arr, lhs)
-      val right = takeAttrRHS(arr, fd._2)
+    val rhs = fd._2.toList
+    val dict = mutable.HashMap.empty[String, Array[String]]
+    partitionBV.value.foreach(d => {
+      val left = takeAttrLHS(d, lhs)
+      val right = takeAttrRHS(d, rhs)
       if(dict.contains(left)){
-        if(!dict(left).equals(right)){
-          return false
+        for(i <- true_rhs){
+          if(!dict(left)(i).equals(right(i))){
+            true_rhs -= i
+            res += i
+          }
         }
       }
       else dict += left -> right
-    }
-    true
+    })
+
+    res.map(x => (fd._1, x)).toList
   }
 
   def check(d:Array[String], lhs:List[Int], rhs:Int, dict:mutable.HashMap[String, String],isWrong: Accumulator[Int])={
