@@ -19,7 +19,7 @@ object Main {
     val input = args(0)
     val output = args(1)
     val rdd = FDUtils.readAsRdd(sc, input)
-    val res = DependencyDiscovery.findOnSpark()indOnSpark(sc, rdd)
+    val res = DependencyDiscovery.findOnSpark(sc, rdd)
     val fdMin = FDUtils.outPutFormat(res)
     sc.parallelize(fdMin).saveAsTextFile(output)
   }

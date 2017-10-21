@@ -92,25 +92,23 @@ object FDUtils {
                    ls: List[Set[Int]]): mutable.HashMap[Set[Int], mutable.Set[Int]] = {
     val sameLHS = mutable.HashMap.empty[Set[Int], mutable.Set[Int]]
     for (lhs <- ls) {
-      if(candidates.contains(lhs)) {
-        val rs = candidates(lhs)
-        if (lhs.nonEmpty) sameLHS.update(lhs, rs)
-      }
+      val rs = candidates(lhs)
+      if (lhs.nonEmpty) sameLHS.update(lhs, rs)
     }
     sameLHS
   }
 
   def cutInSameLhs(sameLHS: mutable.HashMap[Set[Int], mutable.Set[Int]],
-                   failFD: Array[(Set[Int], Int)]): mutable.HashMap[Set[Int], mutable.Set[Int]] = {
+                   failFD: List[(Set[Int], Int)]): mutable.HashMap[Set[Int], mutable.Set[Int]] = {
     failFD.foreach(fd => cut(sameLHS, fd._1, fd._2))
     sameLHS
   }
 
-  def takeAttrRHS(arr: Array[String], attributes: List[Int]): Array[String] = {
-    val res = new Array[String](16)
-    attributes.foreach(attr => res(attr) = arr(attr - 1))
-    res
-  }
+//  def takeAttrRHS(arr: Array[String], attributes: List[Int]): Array[String] = {
+//    val res = new Array[String](16)
+//    attributes.foreach(attr => res(attr) = arr(attr - 1))
+//    res
+//  }
 
   def takeAttrRHS(arr: Array[String], attributes: Int): String = {
     arr(attributes - 1)
@@ -118,27 +116,27 @@ object FDUtils {
 
 
 
-  def check(data: List[Array[String]], lhs: List[Int], rhs: List[Int]): List[Int] ={
-    //val lSize = data.map(d => (FDUtils.takeAttributes(d, lhs),d)).groupBy(_._1).size
-    val res = mutable.Set.empty[Int]
-    var true_rhs = rhs.toSet
-    val dict = mutable.HashMap.empty[String, Array[String]]
-    data.foreach(d => {
-      val left = takeAttrLHS(d, lhs)
-      val right = takeAttrRHS(d, rhs)
-      if(dict.contains(left)){
-        for(i <- true_rhs){
-          if(!dict(left)(i).equals(right(i))){
-            true_rhs -= i
-            res += i
-          }
-        }
-      }
-      else dict += left -> right
-    })
-
-    res.toList
-  }
+//  def check(data: List[Array[String]], lhs: List[Int], rhs: List[Int]): List[Int] ={
+//    //val lSize = data.map(d => (FDUtils.takeAttributes(d, lhs),d)).groupBy(_._1).size
+//    val res = mutable.Set.empty[Int]
+//    var true_rhs = rhs.toSet
+//    val dict = mutable.HashMap.empty[String, Array[String]]
+//    data.foreach(d => {
+//      val left = takeAttrLHS(d, lhs)
+//      val right = takeAttrRHS(d, rhs)
+//      if(dict.contains(left)){
+//        for(i <- true_rhs){
+//          if(!dict(left)(i).equals(right(i))){
+//            true_rhs -= i
+//            res += i
+//          }
+//        }
+//      }
+//      else dict += left -> right
+//    })
+//
+//    res.toList
+//  }
 
   def cut(map: mutable.HashMap[Set[Int], mutable.Set[Int]],
           lhs: Set[Int], rhs: Int) = {

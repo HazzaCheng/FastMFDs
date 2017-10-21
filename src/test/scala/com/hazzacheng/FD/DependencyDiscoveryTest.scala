@@ -1,6 +1,4 @@
 package com.hazzacheng.FD
-import DependencyDiscovery.checkDependency
-import scala.io.Source
 
 import org.scalatest.FunSuite
 
@@ -71,17 +69,13 @@ class DependencyDiscoveryTest extends FunSuite {
 //
 //  }
 
+  test("tupedata"){
+    for(i <- 1 to 20000000){
+      for(j <- i to 2000){
 
-  test("check"){
-    val file = Source.fromFile("test")
-    val data = file.getLines().map(line => line.split(",").map(word => word.trim())).toList
-    data.foreach(d => {
-      d(0) = "allldsad"
-      d(5) = "muks"
-    })
-    //print(checkDependency(data, (Set(1,7),List(6,8,9))))
+      }
+    }
 
   }
-
 
 }
