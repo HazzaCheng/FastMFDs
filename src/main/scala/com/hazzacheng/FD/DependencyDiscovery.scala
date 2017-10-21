@@ -81,6 +81,7 @@ object DependencyDiscovery {
     val failFD = smallPartitionsRDD.flatMap(p =>
       checkDependenciesInSmall(fdsBV, p)).collect().distinct.toList
     failed ++= failFD
+    fdsBV.unpersist()
     FDUtils.cutInSameLhs(fds, failFD)
   }
 
@@ -110,7 +111,7 @@ object DependencyDiscovery {
 
   def checkDependenciesInSmall(fdsBV: Broadcast[mutable.HashMap[Set[Int], mutable.Set[Int]]],
                         partition: List[Array[String]]): List[(Set[Int], Int)] = {
-    val res = fdsBV.value.flatMap(fd => FDUtils.check(partition, fd._1, fd._2)).toList
+    val res = fdsBV.value.toList.flatMap(fd => FDUtils.check(partition, fd._1, fd._2))
     res
   }
 
