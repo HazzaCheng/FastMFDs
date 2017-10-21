@@ -71,13 +71,6 @@ object FDUtils {
     candidates
   }
 
-  def takeAttrLHS(arr: Array[String], attributes: Set[Int]): String = {
-    val s = mutable.StringBuilder.newBuilder
-    attributes.foreach(attr => s.append(arr(attr - 1)))
-
-    s.toString()
-  }
-
   def getLevelFD(candidates: mutable.HashMap[Set[Int], mutable.Set[Int]],
                  ls: List[Set[Int]]): ListBuffer[(Set[Int], Int)] = {
     val fds = ListBuffer.empty[(Set[Int], Int)]
@@ -102,6 +95,13 @@ object FDUtils {
                    failFD: List[(Set[Int], Int)]): mutable.HashMap[Set[Int], mutable.Set[Int]] = {
     failFD.foreach(fd => cut(sameLHS, fd._1, fd._2))
     sameLHS
+  }
+
+  def takeAttrLHS(arr: Array[String], attributes: Set[Int]): String = {
+    val s = mutable.StringBuilder.newBuilder
+    attributes.foreach(attr => s.append(arr(attr - 1) + " "))
+
+    s.toString()
   }
 
   def takeAttrRHS(arr: Array[String], attributes: mutable.Set[Int]): Array[String] = {
@@ -129,7 +129,7 @@ object FDUtils {
       else dict += left -> right
     })
 
-    res.map(f => (lhs.toSet, f)).toList
+    res.map(rhs => (lhs, rhs)).toList
   }
 
   def cut(map: mutable.HashMap[Set[Int], mutable.Set[Int]],
