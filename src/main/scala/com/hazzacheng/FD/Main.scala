@@ -18,7 +18,7 @@ object Main {
 
     val input = args(0)
     val output = args(1)
-    val spiltLen = args(2)
+    val spiltLen = args(2).toInt
     val rdd = FDUtils.readAsRdd(sc, input)
     val res = DependencyDiscovery.findOnSpark(sc, rdd, spiltLen)
     val fdMin = FDUtils.outPutFormat(res)
