@@ -92,8 +92,8 @@ object FDUtils {
                    ls: List[Set[Int]]): mutable.HashMap[Set[Int], mutable.Set[Int]] = {
     val sameLHS = mutable.HashMap.empty[Set[Int], mutable.Set[Int]]
     for (lhs <- ls) {
-      val rs = candidates(lhs)
-      if (lhs.nonEmpty) sameLHS.update(lhs, rs)
+      val rs = candidates.getOrElse(lhs, null)
+      if (rs != null && rs.nonEmpty) sameLHS.update(lhs, rs)
     }
     sameLHS
   }
@@ -109,12 +109,6 @@ object FDUtils {
     attributes.foreach(attr => res(attr) = arr(attr - 1))
     res
   }
-
-//  def takeAttrRHS(arr: Array[String], attributes: Int): String = {
-//    arr(attributes - 1)
-//  }
-
-
 
   def check(data: List[Array[String]], lhs: Set[Int], rhs: mutable.Set[Int]): List[(Set[Int],Int)] ={
     //val lSize = data.map(d => (FDUtils.takeAttributes(d, lhs),d)).groupBy(_._1).size
