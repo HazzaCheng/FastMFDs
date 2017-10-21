@@ -20,17 +20,17 @@ import scala.collection.mutable.ListBuffer
 
 object DependencyDiscovery {
   private val parallelScaleFactor = 4
-  private val spiltLen = 10000
+  //private val spiltLen = 10000
   var time1 = System.currentTimeMillis()
   var time2 = System.currentTimeMillis()
 
-  def findOnSpark(sc: SparkContext, rdd: RDD[Array[String]]): Map[Set[Int], mutable.Set[Int]] = {
+  def findOnSpark(sc: SparkContext, rdd: RDD[Array[String]], spiltLen: Int): Map[Set[Int], mutable.Set[Int]] = {
     val nums = rdd.first().length
     val dependencies = FDUtils.getDependencies(nums)
     val emptyFD = mutable.Set.empty[Int]
     val results = mutable.HashMap.empty[Set[Int], mutable.Set[Int]]
-    //val nums1 = Array(2, 4, 3, 6, 7, 5, 8, 10, 9, 1)
-    for (i <- 1 to nums) {
+    val nums1 = Array(2, 4, 3, 6, 7, 5, 8, 10, 9, 1)
+    for (i <- nums1) {
       time2 = System.currentTimeMillis()
       val candidates = FDUtils.getCandidateDependencies(dependencies, i)
       val lhsAll = candidates.keySet.toList.groupBy(_.size)
