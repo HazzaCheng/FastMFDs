@@ -71,7 +71,7 @@ object FDUtils {
     candidates
   }
 
-  def takeAttrLHS(arr: Array[String], attributes: List[Int]): String = {
+  def takeAttrLHS(arr: Array[String], attributes: Set[Int]): String = {
     val s = mutable.StringBuilder.newBuilder
     attributes.foreach(attr => s.append(arr(attr - 1)))
 
@@ -104,39 +104,39 @@ object FDUtils {
     sameLHS
   }
 
-//  def takeAttrRHS(arr: Array[String], attributes: List[Int]): Array[String] = {
-//    val res = new Array[String](16)
-//    attributes.foreach(attr => res(attr) = arr(attr - 1))
-//    res
-//  }
-
-  def takeAttrRHS(arr: Array[String], attributes: Int): String = {
-    arr(attributes - 1)
+  def takeAttrRHS(arr: Array[String], attributes: mutable.Set[Int]): Array[String] = {
+    val res = new Array[String](16)
+    attributes.foreach(attr => res(attr) = arr(attr - 1))
+    res
   }
 
-
-
-//  def check(data: List[Array[String]], lhs: List[Int], rhs: List[Int]): List[Int] ={
-//    //val lSize = data.map(d => (FDUtils.takeAttributes(d, lhs),d)).groupBy(_._1).size
-//    val res = mutable.Set.empty[Int]
-//    var true_rhs = rhs.toSet
-//    val dict = mutable.HashMap.empty[String, Array[String]]
-//    data.foreach(d => {
-//      val left = takeAttrLHS(d, lhs)
-//      val right = takeAttrRHS(d, rhs)
-//      if(dict.contains(left)){
-//        for(i <- true_rhs){
-//          if(!dict(left)(i).equals(right(i))){
-//            true_rhs -= i
-//            res += i
-//          }
-//        }
-//      }
-//      else dict += left -> right
-//    })
-//
-//    res.toList
+//  def takeAttrRHS(arr: Array[String], attributes: Int): String = {
+//    arr(attributes - 1)
 //  }
+
+
+
+  def check(data: List[Array[String]], lhs: Set[Int], rhs: mutable.Set[Int]): List[(Set[Int],Int)] ={
+    //val lSize = data.map(d => (FDUtils.takeAttributes(d, lhs),d)).groupBy(_._1).size
+    val res = mutable.Set.empty[Int]
+    var true_rhs = rhs
+    val dict = mutable.HashMap.empty[String, Array[String]]
+    data.foreach(d => {
+      val left = takeAttrLHS(d, lhs)
+      val right = takeAttrRHS(d, rhs)
+      if(dict.contains(left)){
+        for(i <- true_rhs){
+          if(!dict(left)(i).equals(right(i))){
+            true_rhs -= i
+            res += i
+          }
+        }
+      }
+      else dict += left -> right
+    })
+
+    res.map(f => (lhs.toSet, f)).toList
+  }
 
   def cut(map: mutable.HashMap[Set[Int], mutable.Set[Int]],
           lhs: Set[Int], rhs: Int) = {

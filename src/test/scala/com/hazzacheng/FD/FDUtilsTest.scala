@@ -121,4 +121,10 @@ class FDUtilsTest extends FunSuite {
     //fd.foreach(println)
   }
 
+  test("check"){
+    val data = List(Array("a","b","c","d"),Array("a","d","c","l"),Array("a","r","c","x"),
+    Array("a","b","c","n"))
+    FDUtils.check(data,Set(1),mutable.Set(2,3,4)).foreach(println(_))
+  }
+
 }

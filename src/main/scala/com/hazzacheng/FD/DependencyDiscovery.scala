@@ -111,24 +111,14 @@ object DependencyDiscovery {
 
   def checkDependenciesInSmall(fdsBV: Broadcast[mutable.HashMap[Set[Int], mutable.Set[Int]]],
                         paratition: List[Array[String]]): List[(Set[Int], Int)] = {
-
+    val res = fdsBV.value.flatMap(fd => FDUtils.check(paratition,fd._1,fd._2)).toList
+    res
   }
 
   def checkDependenciesInBig(partitionBV: Broadcast[List[Array[String]]],
                       fd: (Set[Int], mutable.Set[Int])): List[(Set[Int], Int)] = {
-    val dict = mutable.HashMap.empty[String, String]
-    val lhs = fd._1.toList
-    for(arr <- partitionBV.value){
-      val left = takeAttrLHS(arr, lhs)
-      val right = takeAttrRHS(arr, fd._2)
-      if(dict.contains(left)){
-        if(!dict(left).equals(right)){
-          return false
-        }
-      }
-      else dict += left -> right
-    }
-    true
+    val res = FDUtils.check(partitionBV.value,fd._1,fd._2)
+    res
   }
 
 
