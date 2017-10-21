@@ -113,7 +113,7 @@ object FDUtils {
   def check(data: List[Array[String]], lhs: Set[Int], rhs: mutable.Set[Int]): List[(Set[Int],Int)] ={
     //val lSize = data.map(d => (FDUtils.takeAttributes(d, lhs),d)).groupBy(_._1).size
     val res = mutable.Set.empty[Int]
-    var true_rhs = rhs
+    val true_rhs = rhs.clone()
     val dict = mutable.HashMap.empty[String, Array[String]]
     data.foreach(d => {
       val left = takeAttrLHS(d, lhs)

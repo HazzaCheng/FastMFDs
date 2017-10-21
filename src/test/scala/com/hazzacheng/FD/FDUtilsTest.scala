@@ -105,6 +105,7 @@ class FDUtilsTest extends FunSuite {
     val r = rTuple._1
     r -= 3
     println(data(Set(1,2))._1.size)
+    data.foreach(println)
   }
 
   test("get level fd") {
