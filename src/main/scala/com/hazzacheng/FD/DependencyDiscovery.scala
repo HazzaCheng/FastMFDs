@@ -1,10 +1,9 @@
 package com.hazzacheng.FD
 
-import com.hazzacheng.FD.FDUtils.{takeAttrLHS, takeAttrRHS}
+import org.apache.spark.SparkContext
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.rdd.RDD
 import org.apache.spark.storage.StorageLevel
-import org.apache.spark.SparkContext
 
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
@@ -110,8 +109,8 @@ object DependencyDiscovery {
   }
 
   def checkDependenciesInSmall(fdsBV: Broadcast[mutable.HashMap[Set[Int], mutable.Set[Int]]],
-                        paratition: List[Array[String]]): List[(Set[Int], Int)] = {
-    val res = fdsBV.value.flatMap(fd => FDUtils.check(paratition, fd._1, fd._2)).toList
+                        partition: List[Array[String]]): List[(Set[Int], Int)] = {
+    val res = fdsBV.value.flatMap(fd => FDUtils.check(partition, fd._1, fd._2)).toList
     res
   }
 
@@ -120,8 +119,6 @@ object DependencyDiscovery {
     val res = FDUtils.check(partitionBV.value, fd._1, fd._2)
     res
   }
-
-
 
   def cutLeaves(dependencies: mutable.HashMap[Set[Int], mutable.Set[Int]],
                 candidates: mutable.HashMap[Set[Int], mutable.Set[Int]],

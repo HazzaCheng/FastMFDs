@@ -1,6 +1,6 @@
 package com.hazzacheng.FD
 
-import org.apache.spark.{Accumulator, SparkContext}
+import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 
 import scala.collection.mutable
