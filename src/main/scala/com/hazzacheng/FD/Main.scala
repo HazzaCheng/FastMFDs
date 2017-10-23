@@ -1,6 +1,6 @@
 package com.hazzacheng.FD
 
-import org.apache.spark.SparkContext
+import org.apache.spark.sql.SparkSession
 
 /**
   * Created with IntelliJ IDEA.
@@ -14,15 +14,14 @@ import org.apache.spark.SparkContext
 object Main {
 
   def main(args: Array[String]): Unit = {
-    val sc = new SparkContext()
+    val ss = SparkSession.builder().getOrCreate()
 
     val input = args(0)
     val output = args(1)
-    val spiltLen = args(2).toInt
-    val rdd = FDUtils.readAsRdd(sc, input)
-    val res = DependencyDiscovery.findOnSpark(sc, rdd, spiltLen)
+    val df = FDUtils.readAsDF(ss, input)
+    val res = DependencyDiscovery.findOnSpark(ss, df._2, df._1)
     val fdMin = FDUtils.outPutFormat(res)
-    sc.parallelize(fdMin).saveAsTextFile(output)
+    ss.sparkContext.parallelize(fdMin).saveAsTextFile(output)
   }
 
 

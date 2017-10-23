@@ -2,6 +2,7 @@ package com.hazzacheng.FD
 
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.{DataFrame, SparkSession}
 
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
@@ -16,6 +17,18 @@ import scala.collection.mutable.ListBuffer
   * Time: 8:34 PM
   */
 object FDUtils {
+
+  def readAsDF(ss: SparkSession, filePath: String): (Int, DataFrame) = {
+    val df = ss.read.csv(filePath)
+    val colSize = df.first.length
+    (colSize, df.toDF(createNewColumnName(colSize): _*))
+  }
+
+  def createNewColumnName(colSize: Int): Array[String] = {
+    val names = new Array[String](colSize)
+    Range(0, colSize).foreach(i => names(i) = (i + 1).toString)
+    names
+  }
 
   def readAsRdd(sc: SparkContext, filePath: String): RDD[Array[String]] = {
     sc.textFile(filePath, sc.defaultParallelism * 4)

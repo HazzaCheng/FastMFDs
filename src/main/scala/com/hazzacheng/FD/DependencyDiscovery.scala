@@ -3,6 +3,7 @@ package com.hazzacheng.FD
 import org.apache.spark.SparkContext
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.storage.StorageLevel
 
 import scala.collection.mutable
@@ -24,13 +25,12 @@ object DependencyDiscovery {
   var time1 = System.currentTimeMillis()
   var time2 = System.currentTimeMillis()
 
-  def findOnSpark(sc: SparkContext, rdd: RDD[Array[String]], spiltLen: Int): Map[Set[Int], mutable.Set[Int]] = {
-    val nums = rdd.first().length
-    val dependencies = FDUtils.getDependencies(nums)
+  def findOnSpark(ss: SparkSession,df: DataFrame, colSize: Int): Map[Set[Int], mutable.Set[Int]] = {
+    val dependencies = FDUtils.getDependencies(colSize)
     val emptyFD = mutable.Set.empty[Int]
     val results = mutable.HashMap.empty[Set[Int], mutable.Set[Int]]
-    val nums1 = Array(2, 4, 3, 6, 7, 5, 8, 10, 9, 1)
-    for (i <- nums1) {
+    //val nums1 = Array(2, 4, 3, 6, 7, 5, 8, 10, 9, 1)
+    for (i <- colSize) {
       time2 = System.currentTimeMillis()
       val candidates = FDUtils.getCandidateDependencies(dependencies, i)
       val lhsAll = candidates.keySet.toList.groupBy(_.size)
@@ -102,11 +102,11 @@ object DependencyDiscovery {
     }
   }
 
-  def repart(sc: SparkContext, rdd: RDD[Array[String]], attribute: Int): RDD[List[Array[String]]] = {
+  def repart(ss: SparkSession, rdd: RDD[Array[String]], attribute: Int): RDD[List[Array[String]]] = {
     val partitions = rdd.map(line => (line(attribute - 1), List(line)))
       .reduceByKey(_ ++ _).map(t => t._2)//.repartition(sc.defaultParallelism * parallelScaleFactor)
 
-    partitions
+    partitions.map(p => p.)
   }
 
   def checkDependenciesInSmall(fdsBV: Broadcast[mutable.HashMap[Set[Int], mutable.Set[Int]]],
