@@ -27,6 +27,7 @@ object FDUtils {
   def createNewColumnName(colSize: Int): Array[String] = {
     val names = new Array[String](colSize)
     Range(0, colSize).foreach(i => names(i) = (i + 1).toString)
+
     names
   }
 
