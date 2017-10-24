@@ -26,6 +26,7 @@ object DependencyDiscovery {
   var time2 = System.currentTimeMillis()
 
   def findOnSpark(ss: SparkSession,df: DataFrame, colSize: Int): Map[Set[Int], mutable.Set[Int]] = {
+    df.rdd.map(_.toSeq.toList)
     val dependencies = FDUtils.getDependencies(colSize)
     val emptyFD = mutable.Set.empty[Int]
     val results = mutable.HashMap.empty[Set[Int], mutable.Set[Int]]
@@ -106,7 +107,7 @@ object DependencyDiscovery {
     val partitions = rdd.map(line => (line(attribute - 1), List(line)))
       .reduceByKey(_ ++ _).map(t => t._2)//.repartition(sc.defaultParallelism * parallelScaleFactor)
 
-    partitions.map(p => p.)
+    partitions
   }
 
   def checkDependenciesInSmall(fdsBV: Broadcast[mutable.HashMap[Set[Int], mutable.Set[Int]]],

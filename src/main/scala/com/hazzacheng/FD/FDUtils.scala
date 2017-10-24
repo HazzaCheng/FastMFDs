@@ -32,7 +32,7 @@ object FDUtils {
 
   def readAsRdd(sc: SparkContext, filePath: String): RDD[Array[String]] = {
     sc.textFile(filePath, sc.defaultParallelism * 4)
-      .map(line => line.split(",").map(word => word.trim()))
+      .map(line => line.split(","))
   }
 
   def outPutFormat(minFD: Map[Set[Int], mutable.Set[Int]]): List[String] = {
