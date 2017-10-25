@@ -34,7 +34,7 @@ object FDUtils {
   }
 
   def readAsRdd(sc: SparkContext, filePath: String): RDD[Array[String]] = {
-    sc.textFile(filePath, ss.sparkContext.defaultParallelism * 4)
+    sc.textFile(filePath, sc.defaultParallelism * 4)
       .map(line => line.split(","))
   }
 
