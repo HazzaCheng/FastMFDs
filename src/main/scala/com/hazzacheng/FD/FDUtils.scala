@@ -2,9 +2,6 @@ package com.hazzacheng.FD
 
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.types.{StringType, StructField, StructType}
-import org.apache.spark.sql.{DataFrame, Row, SparkSession}
-import org.apache.spark.storage.StorageLevel
 
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
@@ -20,22 +17,9 @@ import scala.collection.mutable.ListBuffer
   */
 object FDUtils {
 
-  def readAsDF(ss: SparkSession, filePath: String): (Int, DataFrame) = {
-    val df = ss.read.csv(filePath)
-    val colSize = df.first.length
-    (colSize, df.toDF(createNewColumnName(colSize): _*))
-  }
-
-  def createNewColumnName(colSize: Int): Array[String] = {
-    val names = new Array[String](colSize)
-    Range(0, colSize).foreach(i => names(i) = (i + 1).toString)
-
-    names
-  }
-
   def readAsRdd(sc: SparkContext, filePath: String): RDD[Array[String]] = {
     sc.textFile(filePath, sc.defaultParallelism * 4)
-      .map(line => line.split(","))
+      .map(line => line.split(",").map(word => word.trim()))
   }
 
   def outPutFormat(minFD: Map[Set[Int], mutable.Set[Int]]): List[String] = {
@@ -171,19 +155,5 @@ object FDUtils {
     }
   }
 
-  def listToRddToDF(ss: SparkSession, partition: List[Array[String]],
-                    schema: StructType): DataFrame = {
-    val rowRdd = ss.sparkContext.parallelize(partition).map(l => Row.fromSeq(l))
-    val df = ss.createDataFrame(rowRdd, schema).persist(StorageLevel.MEMORY_AND_DISK_SER)
-    df
-  }
-
-  def createStructType(colSize: Int): StructType = {
-    val arr = new Array[StructField](colSize)
-    Range(0, colSize).foreach(i =>
-      arr(i) = StructField((i + 1).toString, StringType, true))
-    val struct = StructType(arr)
-    struct
-  }
 
 }
