@@ -1,6 +1,7 @@
 package com.hazzacheng.FD
 
 import org.apache.spark.SparkContext
+import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.rdd.RDD
 
 import scala.collection.mutable
@@ -110,27 +111,27 @@ object FDUtils {
     res
   }
 
-  def check(data: List[Array[String]], lhs: Set[Int], rhs: mutable.Set[Int]): List[(Set[Int],Int)] ={
-    //val lSize = data.map(d => (FDUtils.takeAttributes(d, lhs),d)).groupBy(_._1).size
-    val res = mutable.Set.empty[Int]
-    val true_rhs = rhs.clone()
-    val dict = mutable.HashMap.empty[String, Array[String]]
-    data.foreach(d => {
-      val left = takeAttrLHS(d, lhs)
-      val right = takeAttrRHS(d, rhs)
-      if(dict.contains(left)){
-        for(i <- true_rhs){
-          if(!dict(left)(i).equals(right(i))){
-            true_rhs -= i
-            res += i
-          }
-        }
+  def check(data: List[Array[String]], lhs: Set[Int], rhs: mutable.Set[Int],  dict: mutable.HashMap[Set[Int], Int]): (List[(Set[Int],Int)], (Set[Int], Int)) ={
+    val lSize = data.map(d => (FDUtils.takeAttrLHS(d, lhs),d)).groupBy(_._1).size
+    val res_list = mutable.ArrayBuffer.empty[(Set[Int],Int)]
+    val temp_dict = mutable.HashMap.empty[Set[Int], Int]
+    rhs.foreach(rs => {
+      if(dict.contains(lhs + rs)){
+        val flag = dict(lhs + rs) == lSize
+        if(!flag)res_list.append((lhs,rs))
       }
-      else dict += left -> right
+      else{
+        if(!temp_dict.contains(lhs + rs)){
+          val rSize = data.map(d => (FDUtils.takeAttrLHS(d, lhs + rs),d)).groupBy(_._1).size
+          temp_dict += (lhs + rs) -> rSize
+        }
+        val flag = temp_dict(lhs + rs) == lSize
+        if(!flag)res_list.append((lhs,rs))
+      }
     })
-
-    res.map(rhs => (lhs, rhs)).toList
+    (res_list.toList, (lhs, lSize))
   }
+
 
   def cut(map: mutable.HashMap[Set[Int], mutable.Set[Int]],
           lhs: Set[Int], rhs: Int) = {

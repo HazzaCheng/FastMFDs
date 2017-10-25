@@ -96,7 +96,6 @@ class FDUtilsTest extends FunSuite {
     assert(str.apply(0) === "[column1,column2]:column4,column5")
     assert(str.apply(1) === "[]:column1,column2,column3")
   }
-
   test("HashMap") {
     val data = mutable.HashMap.empty[Set[Int], (mutable.Set[Int], mutable.HashMap[String,Array[String]])]
     data.put(Set(1,2),mutable.Set(4,3) -> mutable.HashMap.empty[String,Array[String]])
@@ -122,10 +121,12 @@ class FDUtilsTest extends FunSuite {
     //fd.foreach(println)
   }
 
-  test("check"){
-    val data = List(Array("a","b","c","d"),Array("a","d","c","l"),Array("a","r","c","x"),
-    Array("a","b","c","n"))
-    FDUtils.check(data,Set(1),mutable.Set(2,3,4)).foreach(println(_))
-  }
+//  test("check"){
+//    val data = List(Array("a","p","c","d"),Array("a","d","c","l"),Array("a","r","c","x"),
+//    Array("a","b","c","n"))
+//    val f = mutable.Set(2,3,4)
+//    FDUtils.check(data,Set(1,2),f).foreach(println(_))
+//    FDUtils.check(data,Set(1),f).foreach(println(_))
+//  }
 
 }
