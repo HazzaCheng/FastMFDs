@@ -18,8 +18,9 @@ object Main {
 
     val input = args(0)
     val output = args(1)
-    val df = FDUtils.readAsDF(ss, input)
-    val res = DependencyDiscovery.findOnSpark(ss, df._2, df._1)
+    val spiltLen = args(2).toInt
+    val rdd = FDUtils.readAsRdd(ss.sparkContext, input)
+    val res = DependencyDiscovery.findOnSpark(ss, rdd, rdd.first().length, spiltLen)
     val fdMin = FDUtils.outPutFormat(res)
     ss.sparkContext.parallelize(fdMin).saveAsTextFile(output)
   }
