@@ -28,13 +28,13 @@ object DependencyDiscovery {
     val dependencies = FDUtils.getDependencies(nums)
     val emptyFD = mutable.Set.empty[Int]
     val results = mutable.HashMap.empty[Set[Int], mutable.Set[Int]]
-//    val nums1 = Array(2, 4, 3, 6, 7, 5, 8, 10, 9, 1)
+    val nums1 = Array(2, 4, 3, 6, 7, 5, 8, 10, 9, 1)
     for (i <- 1 to nums) {
       time2 = System.currentTimeMillis()
       val candidates = FDUtils.getCandidateDependencies(dependencies, i)
       val lhsAll = candidates.keySet.toList.groupBy(_.size)
       val keys = lhsAll.keys.toList.sortWith((x, y) => x > y)
-      val dict = mutable.HashMap.empty[Long, mutable.HashMap[Set[Int], Int]]
+      val dict = mutable.HashMap.empty[String, mutable.HashMap[Set[Int], Int]]
 
       val partitionsRDD = repart(sc, rdd, i).persist(StorageLevel.MEMORY_AND_DISK_SER)
 //      val smallPartitionsRDD = partitionsRDD.filter(_.length < spiltLen).persist(StorageLevel.MEMORY_AND_DISK_SER)
@@ -76,10 +76,10 @@ object DependencyDiscovery {
   }
 
   def checkSmallPartitions(sc: SparkContext,
-                           smallPartitionsRDD: RDD[(List[Array[String]], Long)],
+                           smallPartitionsRDD: RDD[(String, List[Array[String]])],
                            fds: mutable.HashMap[Set[Int], mutable.Set[Int]],
                            failed: ListBuffer[(Set[Int], Int)],
-                           dict:mutable.HashMap[Long, mutable.HashMap[Set[Int], Int]]): Unit = {
+                           dict:mutable.HashMap[String, mutable.HashMap[Set[Int], Int]]): Unit = {
     val failedFD = mutable.ListBuffer.empty[(Set[Int], Int)]
     val fdsBV = sc.broadcast(fds)
     val dictBV = sc.broadcast(dict)
@@ -112,27 +112,27 @@ object DependencyDiscovery {
 //    }
 //  }
 
-  def repart(sc: SparkContext, rdd: RDD[Array[String]], attribute: Int): RDD[(List[Array[String]], Long)] = {
+  def repart(sc: SparkContext, rdd: RDD[Array[String]], attribute: Int): RDD[(String, List[Array[String]])] = {
     val partitions = rdd.map(line => (line(attribute - 1), List(line)))
-      .reduceByKey(_ ++ _).map(t => t._2).zipWithIndex()
+      .reduceByKey(_ ++ _)//.map(t => t._2).zipWithIndex()
 
     partitions
   }
 
   def checkDependenciesInSmall(fdsBV: Broadcast[mutable.HashMap[Set[Int], mutable.Set[Int]]],
-                               dictBV: Broadcast[mutable.HashMap[Long, mutable.HashMap[Set[Int], Int]]],
-                               partition: (List[Array[String]], Long)
-                              ): (List[(Set[Int], Int)], Long, mutable.HashMap[Set[Int], Int]) = {
+                               dictBV: Broadcast[mutable.HashMap[String, mutable.HashMap[Set[Int], Int]]],
+                               partition: (String, List[Array[String]])
+                              ): (List[(Set[Int], Int)], String, mutable.HashMap[Set[Int], Int]) = {
     val dict = mutable.HashMap.empty[Set[Int], Int]
-    val map = dictBV.value.getOrElse(partition._2, mutable.HashMap.empty[Set[Int], Int])
+    val map = dictBV.value.getOrElse(partition._1, mutable.HashMap.empty[Set[Int], Int])
     val failed = mutable.ListBuffer.empty[(Set[Int],Int)]
     val res = fdsBV.value.toList.map(fd =>
-      FDUtils.check(partition._1, fd._1, fd._2, map))
+      FDUtils.check(partition._2, fd._1, fd._2, map))
     res.foreach(r => {
       failed ++= r._1
       dict += r._2
     })
-    (failed.toList.distinct, partition._2, dict)
+    (failed.toList.distinct, partition._1, dict)
   }
 
 //  def checkDependenciesInBig(partitionBV: Broadcast[List[Array[String]]],

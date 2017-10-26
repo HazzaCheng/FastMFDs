@@ -155,7 +155,7 @@ object FDUtils {
 
   def getKeyString(line: Array[String], indexs: List[Int]): String = {
     val sb = StringBuilder.newBuilder
-    indexs.sorted.foreach(i => sb.append(line(i) + " "))
+    indexs.sorted.foreach(i => sb.append(line(i - 1) + " "))
     sb.toString()
   }
 
