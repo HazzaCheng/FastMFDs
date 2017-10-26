@@ -7,7 +7,6 @@ import org.apache.spark.storage.StorageLevel
 
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
-
 /**
   * Created with IntelliJ IDEA.
   *
@@ -35,8 +34,9 @@ object DependencyDiscovery {
       val candidates = FDUtils.getCandidateDependencies(dependencies, i)
       val lhsAll = candidates.keySet.toList.groupBy(_.size)
       val keys = lhsAll.keys.toList.sortWith((x, y) => x > y)
+      val dict = mutable.HashMap.empty[Long, mutable.HashMap[Set[Int], Int]]
 
-      val partitionsRDD = repart(sc, rdd, i).zipWithIndex().persist(StorageLevel.MEMORY_AND_DISK_SER)
+      val partitionsRDD = repart(sc, rdd, i).persist(StorageLevel.MEMORY_AND_DISK_SER)
 //      val smallPartitionsRDD = partitionsRDD.filter(_.length < spiltLen).persist(StorageLevel.MEMORY_AND_DISK_SER)
 //      val bigPartitions = partitionsRDD.filter(_.length >= spiltLen).collect()
 //      partitionsRDD.unpersist()
@@ -46,7 +46,6 @@ object DependencyDiscovery {
 //        || bigPartitionsLen == 0) emptyFD += i
 //      println("====Small Partitions Size: " + smallPartitionsRDD.count())
 //      println("====Big Partitions Size: " + bigPartitionsLen)
-      val dict = mutable.HashMap.empty[Long, mutable.HashMap[Set[Int], Int]]
       for (k <- keys) {
         val ls = lhsAll(k)
         val fds = FDUtils.getSameLhsFD(candidates, ls)
@@ -84,17 +83,16 @@ object DependencyDiscovery {
     val failedFD = mutable.ListBuffer.empty[(Set[Int], Int)]
     val fdsBV = sc.broadcast(fds)
     val dictBV = sc.broadcast(dict)
-    val tupleInfo = smallPartitionsRDD.map(p => checkDependenciesInSmall(fdsBV, p, dictBV)).collect()
+    val tupleInfo = smallPartitionsRDD.map(p =>
+      checkDependenciesInSmall(fdsBV, dictBV, p)).collect()
     dict.clear()
     tupleInfo.foreach(tuple => {
       dict += tuple._2 -> tuple._3
       failedFD ++= tuple._1
     })
-    val fa = failedFD.distinct.toList
-    failed ++= fa
+    failed ++= failedFD.distinct.toList
     fdsBV.unpersist()
     dictBV.unpersist()
-    FDUtils.cutInSameLhs(fds, fa)
   }
 
 //  def checkBigPartitions(sc: SparkContext,
@@ -114,27 +112,22 @@ object DependencyDiscovery {
 //    }
 //  }
 
-  def repart(sc: SparkContext, rdd: RDD[Array[String]], attribute: Int): RDD[List[Array[String]]] = {
+  def repart(sc: SparkContext, rdd: RDD[Array[String]], attribute: Int): RDD[(List[Array[String]], Long)] = {
     val partitions = rdd.map(line => (line(attribute - 1), List(line)))
-      .reduceByKey(_ ++ _).map(t => t._2)//.repartition(sc.defaultParallelism * parallelScaleFactor)
+      .reduceByKey(_ ++ _).map(t => t._2).zipWithIndex()
 
     partitions
   }
 
   def checkDependenciesInSmall(fdsBV: Broadcast[mutable.HashMap[Set[Int], mutable.Set[Int]]],
-                              partition: (List[Array[String]], Long),
-                              dictBV: Broadcast[mutable.HashMap[Long, mutable.HashMap[Set[Int], Int]]]): (List[(Set[Int], Int)], Long, mutable.HashMap[Set[Int], Int]) = {
+                               dictBV: Broadcast[mutable.HashMap[Long, mutable.HashMap[Set[Int], Int]]],
+                               partition: (List[Array[String]], Long)
+                              ): (List[(Set[Int], Int)], Long, mutable.HashMap[Set[Int], Int]) = {
     val dict = mutable.HashMap.empty[Set[Int], Int]
-    val none_dict = mutable.HashMap.empty[Set[Int], Int]
-    val failed = mutable.ArrayBuffer.empty[(Set[Int],Int)]
-    val res = fdsBV.value.toList.map(fd => {
-      if(dictBV.value.contains(partition._2)){
-        FDUtils.check(partition._1, fd._1, fd._2, dictBV.value(partition._2))
-      }
-      else{
-        FDUtils.check(partition._1, fd._1, fd._2, none_dict)
-      }
-    })
+    val map = dictBV.value.getOrElse(partition._2, mutable.HashMap.empty[Set[Int], Int])
+    val failed = mutable.ListBuffer.empty[(Set[Int],Int)]
+    val res = fdsBV.value.toList.map(fd =>
+      FDUtils.check(partition._1, fd._1, fd._2, map))
     res.foreach(r => {
       failed ++= r._1
       dict += r._2

@@ -111,25 +111,52 @@ object FDUtils {
     res
   }
 
-  def check(data: List[Array[String]], lhs: Set[Int], rhs: mutable.Set[Int],  dict: mutable.HashMap[Set[Int], Int]): (List[(Set[Int],Int)], (Set[Int], Int)) ={
-    val lSize = data.map(d => (FDUtils.takeAttrLHS(d, lhs),d)).groupBy(_._1).size
-    val res_list = mutable.ArrayBuffer.empty[(Set[Int],Int)]
-    val temp_dict = mutable.HashMap.empty[Set[Int], Int]
-    rhs.foreach(rs => {
-      if(dict.contains(lhs + rs)){
-        val flag = dict(lhs + rs) == lSize
-        if(!flag)res_list.append((lhs,rs))
+  def check(lines: List[Array[String]],
+            lhs: Set[Int],
+            rhs: mutable.Set[Int],
+            dict: mutable.HashMap[Set[Int], Int]
+           ): (List[(Set[Int],Int)], (Set[Int], Int)) = {
+
+    val (existed, nonExisted) = rhs.partition(r => dict.contains(lhs + r))
+    val (lhsSize, wrong) = getDistinctSizeAndWrong(lines, dict, lhs.toList, nonExisted.toList)
+    val failRhs = wrong ++ existed.toList.filter(r => dict(lhs + r) != lhsSize)
+    val failFD = failRhs.map(r => (lhs, r))
+
+    (failFD, (lhs, lhsSize))
+  }
+
+  def getDistinctSizeAndWrong(lines: List[Array[String]],
+                              dict: mutable.HashMap[Set[Int], Int],
+                              lhs: List[Int],
+                              nonExist: List[Int]): (Int, List[Int]) = {
+    val set = mutable.HashSet.empty[String]
+    var counter = 0
+    val sets = nonExist.zipWithIndex.map(i =>
+      (i._2, i._1, mutable.HashSet.empty[String]))
+    val counters = new Array[Int](nonExist.length)
+    lines.foreach{line =>
+      val key = getKeyString(line, lhs)
+      if (!set.contains(key)) {
+        counter += 1
+        set.add(key)
       }
-      else{
-        if(!temp_dict.contains(lhs + rs)){
-          val rSize = data.map(d => (FDUtils.takeAttrLHS(d, lhs + rs),d)).groupBy(_._1).size
-          temp_dict += (lhs + rs) -> rSize
+      sets.foreach{i =>
+        val k = getKeyString(line, i._2 :: lhs)
+        if (!i._3.contains(k)) {
+          counters(i._1) += 1
+          i._3.add(k)
         }
-        val flag = temp_dict(lhs + rs) == lSize
-        if(!flag)res_list.append((lhs,rs))
       }
-    })
-    (res_list.toList, (lhs, lSize))
+    }
+    sets.foreach(i =>dict.update(lhs.toSet + i._2, counters(i._1)))
+    val wrong = sets.filter(i => counter != counters(i._1)).map(_._2)
+    (counter, wrong)
+  }
+
+  def getKeyString(line: Array[String], indexs: List[Int]): String = {
+    val sb = StringBuilder.newBuilder
+    indexs.sorted.foreach(i => sb.append(line(i) + " "))
+    sb.toString()
   }
 
 
