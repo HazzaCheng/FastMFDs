@@ -17,13 +17,13 @@ import scala.collection.mutable.ListBuffer
   * Time: 8:34 PM
   */
 object FDUtils {
-  def getColSizeAndOreders(ss: SparkSession, filePath: String): Array[Int] = {
+  def getColSizeAndOreders(ss: SparkSession, filePath: String): (Int, Array[Int]) = {
     val df = ss.read.csv(filePath)
     val colSize = df.first.length
     val orders = df.columns.map(col => df.groupBy(col).count().count())
       .zipWithIndex.sortWith((x, y) => x._1 > y._1)
     df.unpersist()
-    orders.map(x => x._2 + 1)
+    (colSize, orders.map(x => x._2 + 1))
   }
 
   def createNewColumnName(colSize: Int): Array[String] = {

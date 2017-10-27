@@ -14,7 +14,7 @@ import org.apache.spark.sql.SparkSession
 object Main {
 
   def main(args: Array[String]): Unit = {
-    val ss = new SparkSession()
+    val ss = SparkSession.builder().getOrCreate()
     val sc = ss.sparkContext
     val input = args(0)
     val output = args(1)
