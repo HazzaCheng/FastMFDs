@@ -130,7 +130,7 @@ object DependencyDiscovery {
       FDUtils.check(partition._2, fd._1, fd._2, map))
     res.foreach(r => {
       failed ++= r._1
-      dict += r._2
+      dict.update(r._2._1, r._2._2)
     })
     (failed.toList.distinct, partition._1, dict)
   }
