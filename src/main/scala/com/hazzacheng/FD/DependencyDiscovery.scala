@@ -23,13 +23,13 @@ object DependencyDiscovery {
   var time1 = System.currentTimeMillis()
   var time2 = System.currentTimeMillis()
 
-  def findOnSpark(sc: SparkContext, rdd: RDD[Array[String]], spiltLen: Int): Map[Set[Int], mutable.Set[Int]] = {
-    val nums = rdd.first().length
-    val dependencies = FDUtils.getDependencies(nums)
+  def findOnSpark(sc: SparkContext, rdd: RDD[Array[String]],
+                  colSize: Int, orders: Array[Int], spiltLen: Int): Map[Set[Int], mutable.Set[Int]] = {
+    val dependencies = FDUtils.getDependencies(colSize)
     val emptyFD = mutable.Set.empty[Int]
     val results = mutable.HashMap.empty[Set[Int], mutable.Set[Int]]
     val nums1 = Array(2, 4, 3, 6, 7, 5, 8, 10, 9, 1)
-    for (i <- 1 to nums) {
+    for (i <- orders) {
       time2 = System.currentTimeMillis()
       val candidates = FDUtils.getCandidateDependencies(dependencies, i)
       val lhsAll = candidates.keySet.toList.groupBy(_.size)

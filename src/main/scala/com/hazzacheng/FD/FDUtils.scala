@@ -1,8 +1,8 @@
 package com.hazzacheng.FD
 
 import org.apache.spark.SparkContext
-import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.SparkSession
 
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
@@ -17,6 +17,22 @@ import scala.collection.mutable.ListBuffer
   * Time: 8:34 PM
   */
 object FDUtils {
+  def getColSizeAndOreders(ss: SparkSession, filePath: String): Array[Int] = {
+    val df = ss.read.csv(filePath)
+    val colSize = df.first.length
+    val orders = df.columns.map(col => df.groupBy(col).count().count())
+      .zipWithIndex.sortWith((x, y) => x._1 > y._1)
+    df.unpersist()
+    orders.map(x => x._2 + 1)
+  }
+
+  def createNewColumnName(colSize: Int): Array[String] = {
+    val names = new Array[String](colSize)
+    Range(0, colSize).foreach(i => names(i) = (i + 1).toString)
+
+    names
+  }
+
 
   def readAsRdd(sc: SparkContext, filePath: String): RDD[Array[String]] = {
     sc.textFile(filePath, sc.defaultParallelism * 4)

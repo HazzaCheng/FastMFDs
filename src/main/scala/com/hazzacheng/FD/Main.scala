@@ -1,9 +1,5 @@
 package com.hazzacheng.FD
 
-import org.apache.spark.SparkContext
-import org.apache.spark.sql.Row
-import org.apache.spark.sql.types.{DataTypes, StructField, StructType}
-import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.SparkSession
 
 /**
@@ -18,12 +14,14 @@ import org.apache.spark.sql.SparkSession
 object Main {
 
   def main(args: Array[String]): Unit = {
-    val sc = new SparkContext()
+    val ss = new SparkSession()
+    val sc = ss.sparkContext
     val input = args(0)
     val output = args(1)
 //    val spiltLen = args(2).toInt
+    val (colSize, orders) = FDUtils.getColSizeAndOreders(ss, input)
     val rdd = FDUtils.readAsRdd(sc, input)
-    val res = DependencyDiscovery.findOnSpark(sc, rdd, 1000)
+    val res = DependencyDiscovery.findOnSpark(sc, rdd, colSize, orders, 1000)
     val fdMin = FDUtils.outPutFormat(res)
     sc.parallelize(fdMin).saveAsTextFile(output)
 
