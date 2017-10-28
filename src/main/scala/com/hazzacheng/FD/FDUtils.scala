@@ -127,6 +127,61 @@ object FDUtils {
     res
   }
 
+  def checkAll(lines: List[Array[String]],
+               fds: mutable.HashMap[Set[Int], mutable.Set[Int]],
+               dict: mutable.HashMap[Set[Int], Int]
+              ): (List[(Set[Int], Int)], mutable.HashMap[Set[Int], Int]) = {
+    val lhsMap = mutable.HashMap.empty[Set[Int], Int]
+    val all = getFdFromMap(fds)
+    val allLhs = fds.keys.toList
+    //val distinct = all.groupBy(x => x._1 + x._2)
+    val distinct = all.map(x => x._1 + x._2).distinct
+    val (existed, nonExisted) = distinct.partition(x => dict.contains(x))
+    val lhsCount = getCounts(lines, allLhs, nonExisted, dict)
+    lhsCount.foreach(i => lhsMap.put(i._1, i._2))
+    val failFD = all.filter(i => lhsMap(i._1) != dict(i._1 + i._2))
+
+    (failFD, lhsMap)
+  }
+
+  def getCounts(lines: List[Array[String]],
+                allLhs: List[Set[Int]],
+                nonExisted: List[Set[Int]],
+                dict: mutable.HashMap[Set[Int], Int]): List[(Set[Int], Int)] = {
+    val counters1 = new Array[Int](allLhs.length)
+    val counters2 = new Array[Int](nonExisted.length)
+    val sets1 = allLhs.zipWithIndex
+      .map(x => (x._2, x._1, mutable.HashSet.empty[String]))
+    val sets2 = nonExisted.zipWithIndex
+      .map(x => (x._2, x._1, mutable.HashSet.empty[String]))
+
+    lines.foreach(line => {
+      sets1.foreach(i => {
+        val k = getKeyString(line, i._2.toList)
+        if (!i._3.contains(k)) {
+          i._3.add(k)
+          counters1(i._1) += 1
+        }
+      })
+      sets2.foreach(i => {
+        val k = getKeyString(line, i._2.toList)
+        if (!i._3.contains(k)) {
+          i._3.add(k)
+          counters2(i._1) += 1
+        }
+      })
+    })
+    sets2.foreach(i => dict.put(i._2, counters2(i._1)))
+    val res = sets1.map(i => (i._2, counters1(i._1)))
+
+    res
+  }
+
+  def getFdFromMap(fds: mutable.HashMap[Set[Int], mutable.Set[Int]]
+                  ): List[(Set[Int], Int)] = {
+    fds.toList.flatMap(fs => fs._2.toList.map(fd => (fs._1, fd)))
+  }
+
   def checkEach(lines: List[Array[String]],
             lhs: Set[Int],
             rhs: mutable.Set[Int],
