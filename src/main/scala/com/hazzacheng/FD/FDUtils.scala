@@ -127,7 +127,7 @@ object FDUtils {
     res
   }
 
-  def check(lines: List[Array[String]],
+  def checkEach(lines: List[Array[String]],
             lhs: Set[Int],
             rhs: mutable.Set[Int],
             dict: mutable.HashMap[Set[Int], Int]

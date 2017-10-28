@@ -18,14 +18,11 @@ object Main {
     val sc = ss.sparkContext
     val input = args(0)
     val output = args(1)
-//    val spiltLen = args(2).toInt
     val (colSize, orders) = FDUtils.getColSizeAndOreders(ss, input)
     val rdd = FDUtils.readAsRdd(sc, input)
-    val res = DependencyDiscovery.findOnSpark(sc, rdd, colSize, orders, 1000)
+    val res = DependencyDiscovery.findOnSpark(sc, rdd, colSize, orders)
     val fdMin = FDUtils.outPutFormat(res)
     sc.parallelize(fdMin).saveAsTextFile(output)
-
-
   }
 
 
