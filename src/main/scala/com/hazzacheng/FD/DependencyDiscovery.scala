@@ -28,7 +28,6 @@ object DependencyDiscovery {
     val dependencies = FDUtils.getDependencies(colSize)
     val emptyFD = mutable.Set.empty[Int]
     val results = mutable.HashMap.empty[Set[Int], mutable.Set[Int]]
-    val nums1 = Array(2, 4, 3, 6, 7, 5, 8, 10, 9, 1)
     for (i <- orders) {
       time2 = System.currentTimeMillis()
       val candidates = FDUtils.getCandidateDependencies(dependencies, i)
@@ -49,17 +48,19 @@ object DependencyDiscovery {
       for (k <- keys) {
         val ls = lhsAll(k)
         val fds = FDUtils.getSameLhsFD(candidates, ls)
-        val failed: ListBuffer[(Set[Int], Int)] = ListBuffer.empty
-        time1 = System.currentTimeMillis()
-        checkSmallPartitions(sc, partitionsRDD, fds, failed, dict)
-        println("===========Paritions Small" + i + " " + k + " Use Time=============" + (System.currentTimeMillis() - time1))
-//        time1 = System.currentTimeMillis()
-//        checkBigPartitions(sc, bigPartitions, fds, failed)
-//        println("===========Paritions Big" + i + " " + k + " Use Time=============" + (System.currentTimeMillis() - time1))
+        if (fds.nonEmpty) {
+          val failed: ListBuffer[(Set[Int], Int)] = ListBuffer.empty
+          time1 = System.currentTimeMillis()
+          checkSmallPartitions(sc, partitionsRDD, fds, failed, dict)
+          println("===========Paritions Small" + i + " " + k + " Use Time=============" + (System.currentTimeMillis() - time1))
+          //        time1 = System.currentTimeMillis()
+          //        checkBigPartitions(sc, bigPartitions, fds, failed)
+          //        println("===========Paritions Big" + i + " " + k + " Use Time=============" + (System.currentTimeMillis() - time1))
 
-        time1 = System.currentTimeMillis()
-        cutLeaves(dependencies, candidates, failed.toList, i)
-        println("===========Cut Leaves" + k + " Use Time=============" + System.currentTimeMillis() + " " + time1 + " " + (System.currentTimeMillis() - time1))
+          time1 = System.currentTimeMillis()
+          cutLeaves(dependencies, candidates, failed.toList, i)
+          println("===========Cut Leaves" + k + " Use Time=============" + System.currentTimeMillis() + " " + time1 + " " + (System.currentTimeMillis() - time1))
+        }
       }
 
       results ++= candidates
