@@ -97,16 +97,16 @@ object DependencyDiscovery {
               ): (List[(Set[Int], Int)], String, mutable.HashMap[Set[Int], Int]) = {
     val dict = mutable.HashMap.empty[Set[Int], Int]
     val map = dictBV.value.getOrElse(partition._1, mutable.HashMap.empty[Set[Int], Int])
-//    val failed = mutable.ListBuffer.empty[(Set[Int],Int)]
-//    val res = fdsBV.value.toList.map(fd =>
-//      FDUtils.checkEach(partition._2, fd._1, fd._2, map))
-//    res.foreach(r => {
-//      failed ++= r._1
-//      dict.update(r._2._1, r._2._2)
-//    })
-//    (failed.toList.distinct, partition._1, dict)
-    val res = FDUtils.checkAll(partition._2, fdsBV.value, map)
-    (res._1, partition._1, res._2)
+    val failed = mutable.ListBuffer.empty[(Set[Int],Int)]
+    val res = fdsBV.value.toList.map(fd =>
+      FDUtils.checkEach(partition._2, fd._1, fd._2, map))
+    res.foreach(r => {
+      failed ++= r._1
+      dict.put(r._2._1, r._2._2)
+    })
+    (failed.toList.distinct, partition._1, dict)
+//    val res = FDUtils.checkAll(partition._2, fdsBV.value, map)
+//    (res._1, partition._1, res._2)
   }
 
   def cutLeaves(dependencies: mutable.HashMap[Set[Int], mutable.Set[Int]],
