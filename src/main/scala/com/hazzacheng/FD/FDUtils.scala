@@ -4,6 +4,7 @@ import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.SparkSession
 
+import scala.collection.immutable.HashMap
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 
@@ -297,6 +298,12 @@ object FDUtils {
       if(x ++ y == y)true
       else false
     }
+  }
+
+  def getDependenciesNums(fds: mutable.HashMap[Set[Int], mutable.Set[Int]]): Int = {
+    var count = 0;
+    fds.toList.foreach(x => count += x._2.size)
+    count
   }
 
 

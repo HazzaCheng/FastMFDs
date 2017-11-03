@@ -46,6 +46,8 @@ object DependencyDiscovery {
       for (k <- keys) {
         val ls = lhsAll(k)
         val fds = FDUtils.getSameLhsFD(candidates, ls)
+        println("========Size lhs:"  + i + " " + k + " " + fds.size)
+        println("========Size depend:"  + i + " " + k + " " + FDUtils.getDependenciesNums(fds))
         if (fds.nonEmpty) {
           val failed: ListBuffer[(Set[Int], Int)] = ListBuffer.empty
           if (i._2 > 20) {
@@ -54,13 +56,16 @@ object DependencyDiscovery {
             println("===========Paritions Small" + i + " " + k + " Use Time=============" + (System.currentTimeMillis() - time1))
           } else {
             time1 = System.currentTimeMillis()
-            checkLocalPartitions(sc, partitionsLocal, fds, failed)
+            checkLocalPartitions(sc, partitionsLocal, fds, failed, i._1, k)
             println("===========Paritions Big" + i + " " + k + " Use Time=============" + (System.currentTimeMillis() - time1))
           }
           time1 = System.currentTimeMillis()
-          val leaves = cutLeaves(dependencies, candidates, failed.toList, i._1)
-          println("=========== reduce leaves " + i + " " + k + " " + leaves)
-          println("===========Cut Leaves" + k + " Use Time=============" + System.currentTimeMillis() + " " + time1 + " " + (System.currentTimeMillis() - time1))
+          println("========Size failed:"  + i + " " + k + " " + failed.size)
+          if (failed.nonEmpty) {
+            val leaves = cutLeaves(dependencies, candidates, failed.toList, i._1)
+            println("=========== reduce leaves " + i + " " + k + " " + leaves)
+            println("===========Cut Leaves" + k + " Use Time=============" + System.currentTimeMillis() + " " + time1 + " " + (System.currentTimeMillis() - time1))
+          }
         }
       }
 
@@ -123,17 +128,24 @@ object DependencyDiscovery {
 
   def checkLocalPartitions(sc: SparkContext,
                            partitions: Array[List[Array[String]]],
-                         fds: mutable.HashMap[Set[Int], mutable.Set[Int]],
-                         failed: ListBuffer[(Set[Int], Int)]): Unit = {
+                           fds: mutable.HashMap[Set[Int], mutable.Set[Int]],
+                           failed: ListBuffer[(Set[Int], Int)], i: Int, k: Int): Unit = {
+    var j = 1;
     for (partition <- partitions) {
       if (fds.nonEmpty) {
         val partitionBV = sc.broadcast(partition)
         val fdsList = fds.toList
         val failFD = sc.parallelize(fdsList).flatMap(fd =>
           checkFDs(partitionBV, fd)).collect().distinct.toList
-        failed ++= failFD
-        FDUtils.cutInSameLhs(fds, failFD)
+        if (failFD.nonEmpty) {
+          failed ++= failFD
+          println("========Size before cut same lhs:"  + i + " " + k + " " + j + " " + FDUtils.getDependenciesNums(fds))
+          FDUtils.cutInSameLhs(fds, failFD)
+          println("========Size failed In Partition:"  + i + " " + k + " " + j + " " + failed.size)
+          println("========Size after cut same lhs:"  + i + " " + k + " " + j + " " + FDUtils.getDependenciesNums(fds))
+        }
         partitionBV.unpersist()
+        j += 1
       }
     }
   }
