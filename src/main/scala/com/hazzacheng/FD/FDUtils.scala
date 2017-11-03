@@ -17,13 +17,13 @@ import scala.collection.mutable.ListBuffer
   * Time: 8:34 PM
   */
 object FDUtils {
-  def getColSizeAndOreders(ss: SparkSession, filePath: String): (Int, Array[Int]) = {
+  def getColSizeAndOreders(ss: SparkSession, filePath: String): (Int, Array[(Int, Long)]) = {
     val df = ss.read.csv(filePath)
     val colSize = df.first.length
     val orders = df.columns.map(col => df.groupBy(col).count().count())
       .zipWithIndex.sortWith((x, y) => x._1 > y._1)
     df.unpersist()
-    (colSize, orders.map(x => x._2 + 1))
+    (colSize, orders.map(x => (x._2 + 1, x._1)))
   }
 
   def createNewColumnName(colSize: Int): Array[String] = {
@@ -230,20 +230,65 @@ object FDUtils {
     sb.toString()
   }
 
+  def check(data: List[Array[String]],
+            lhs: Set[Int],
+            rhs: mutable.Set[Int]): List[(Set[Int],Int)] ={
+    //val lSize = data.map(d => (FDUtils.takeAttributes(d, lhs),d)).groupBy(_._1).size
+    val res = mutable.Set.empty[Int]
+    val true_rhs = rhs.clone()
+    val dict = mutable.HashMap.empty[String, Array[String]]
+    data.foreach(d => {
+      val left = takeAttrLHS(d, lhs)
+      val right = takeAttrRHS(d, rhs)
+      if(dict.contains(left)){
+        for(i <- true_rhs){
+          if(!dict(left)(i).equals(right(i))){
+            true_rhs -= i
+            res += i
+          }
+        }
+      }
+      else dict += left -> right
+    })
+
+    res.map(rhs => (lhs, rhs)).toList
+  }
+
+
+//  def cut(map: mutable.HashMap[Set[Int], mutable.Set[Int]],
+//          lhs: Set[Int], rhs: Int) = {
+//    val ot = map.get(lhs)
+//    if (ot.isDefined) {
+//      val v = ot.get
+//      if (v contains rhs) {
+//        if (v.size == 1) map -= lhs
+//        else {
+//          v -= rhs
+//          map.update(lhs, v)
+//        }
+//      }
+//    }
+//  }
 
   def cut(map: mutable.HashMap[Set[Int], mutable.Set[Int]],
-          lhs: Set[Int], rhs: Int) = {
+          lhs: Set[Int], rhs: Int): Int = {
+    var sum = 0
     val ot = map.get(lhs)
     if (ot.isDefined) {
       val v = ot.get
       if (v contains rhs) {
-        if (v.size == 1) map -= lhs
+        if (v.size == 1){
+          map -= lhs
+          sum += 1
+        }
         else {
           v -= rhs
+          sum += 1
           map.update(lhs, v)
         }
       }
     }
+    sum
   }
 
   def isSubset(x:Set[Int], y:Set[Int]):Boolean = {
