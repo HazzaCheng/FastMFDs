@@ -31,7 +31,7 @@ object DependencyDiscovery {
     val temp = orders.head
     orders(0) = orders.last
     orders(orders.length - 1) = temp
-
+    var sum = 0
     for (i <- orders) {
       time2 = System.currentTimeMillis()
       val candidates = FDUtils.getCandidateDependencies(dependencies, i._1)
@@ -42,13 +42,13 @@ object DependencyDiscovery {
       val partitionsRDD = repart(sc, rdd, i._1).persist(StorageLevel.MEMORY_AND_DISK_SER)
       var partitionsLocal: Array[List[Array[String]]] = Array()
       if (i._2 <= 20) partitionsLocal = partitionsRDD.collect().map(x => x._2)
-
       for (k <- keys) {
         val ls = lhsAll(k)
         val fds = FDUtils.getSameLhsFD(candidates, ls)
         println("========Size- lhs:"  + i + " " + k + " " + fds.size)
         println("========Size- depend:"  + i + " " + k + " " + FDUtils.getDependenciesNums(fds))
         if (fds.nonEmpty) {
+          sum += 1
           val failed: ListBuffer[(Set[Int], Int)] = ListBuffer.empty
           if (i._2 > 20) {
             time1 = System.currentTimeMillis()
@@ -72,7 +72,7 @@ object DependencyDiscovery {
       results ++= candidates
       println("===========Common Attr" + i + " Use Time=============" + (System.currentTimeMillis() - time2))
     }
-
+    println("============Tasks============" + sum + "======================")
     time1 = System.currentTimeMillis()
     val minFD = DependencyDiscovery.findMinFD(sc, results)
     println("===========FindMinFD Use Time=============" + System.currentTimeMillis() + " " + time1 + " " +(System.currentTimeMillis() - time1))
@@ -112,6 +112,7 @@ object DependencyDiscovery {
                dictBV: Broadcast[mutable.HashMap[String, mutable.HashMap[Set[Int], Int]]],
                partition: (String, List[Array[String]])
               ): (List[(Set[Int], Int)], String, mutable.HashMap[Set[Int], Int]) = {
+    println("===========CheckFDs=======:" + partition._1 + "  " +fdsBV.value.keys + "=========")
     val dict = mutable.HashMap.empty[Set[Int], Int]
     val map = dictBV.value.getOrElse(partition._1, mutable.HashMap.empty[Set[Int], Int])
     val failed = mutable.ListBuffer.empty[(Set[Int],Int)]
@@ -130,7 +131,7 @@ object DependencyDiscovery {
                            partitions: Array[List[Array[String]]],
                            fds: mutable.HashMap[Set[Int], mutable.Set[Int]],
                            failed: ListBuffer[(Set[Int], Int)], i: Int, k: Int): Unit = {
-    var j = 1;
+    var j = 1
     for (partition <- partitions) {
       if (fds.nonEmpty) {
         val partitionBV = sc.broadcast(partition)
