@@ -26,8 +26,11 @@ object FastFDs {
   private def genAgreeSets(sc: SparkContext, rdd: RDD[(Array[String], Long)],
                   colSize: Int): Array[Set[Int]] = {
     val sets = mutable.HashSet.empty[Set[Int]]
+    val striped = new Array[Array[(Set[Int], Int)]](colSize)
     for (i <- 1 to colSize) {
-      sets ++= getStripPartitions(sc, rdd, i).collect()
+      val temp = getStripPartitions(sc, rdd, i).collect()
+      striped(i - 1) = temp.zipWithIndex
+      sets ++= temp
     }
 
     getMC(sc, sets)
