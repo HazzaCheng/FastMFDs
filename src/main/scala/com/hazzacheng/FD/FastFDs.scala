@@ -46,19 +46,21 @@ object FastFDs {
 
   private def getMC(sc: SparkContext, sets: mutable.HashSet[Set[Int]]): Array[Set[Int]] = {
     time1 = System.currentTimeMillis()
-    val temp = sets.toArray.sortWith((x, y) => x.size > y.size)
+    val temp = sets.toArray.map(x => (x.size, x)).sortWith((x, y) => x._1 > y._1)
     println("===========USE TIME sort: " + (System.currentTimeMillis() - time1))
     val tempBV = sc.broadcast(temp)
     val mc = sc.parallelize(temp).filter(isBigSet(tempBV, _)).collect()
 
-    mc
+    mc.map(x => x._2)
   }
 
-  private def isBigSet(tempBV: Broadcast[Array[Set[Int]]], s: Set[Int]): Boolean = {
+  private def isBigSet(tempBV: Broadcast[Array[(Int,Set[Int])]], s: (Int,Set[Int])): Boolean = {
     val arr = tempBV.value
-    for (set <- arr)
-      if ((s & set) == s && s != set) return false
-
+    for (set <- arr) {
+      if(s._1 <= set._1) {
+        if ((s._2 & set._2) == s && s != set) return false
+      }
+    }
     true
   }
 
