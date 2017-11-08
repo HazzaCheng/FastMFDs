@@ -3,6 +3,7 @@ package com.hazzacheng.FD
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.SparkSession
+import org.apache.spark.storage.StorageLevel
 
 import scala.collection.immutable.HashMap
 import scala.collection.mutable
@@ -39,6 +40,13 @@ object FDUtils {
     sc.textFile(filePath, sc.defaultParallelism * 4)
       .map(line => line.split(",").map(word => word.trim()))
   }
+
+  def readAsRddWithIndex(sc: SparkContext, filePath: String): RDD[(Array[String], Long)] = {
+    sc.textFile(filePath, sc.defaultParallelism * 4)
+      .map(line => line.split(",").map(word => word.trim()))
+      .zipWithIndex().persist(StorageLevel.MEMORY_AND_DISK_SER)
+  }
+
 
   def outPutFormat(minFD: Map[Set[Int], mutable.Set[Int]]): List[String] = {
     minFD.map(d => d._1.toList.sorted.map(x => "column" + x).mkString("[", ",", "]")

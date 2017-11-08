@@ -188,7 +188,7 @@ object DependencyDiscovery {
 
 
   def findMinFD(sc:SparkContext,
-                fd:mutable.HashMap[Set[Int], mutable.Set[Int]]):  Map[Set[Int], mutable.Set[Int]] = {
+                fd:mutable.HashMap[Set[Int], mutable.Set[Int]]): Map[Set[Int], mutable.Set[Int]] = {
     val fdList = fd.toList
     val data = fdList.groupBy(_._1.size).map(f => (f._1, f._2.toMap))
     val index = data.keys.toList.sortWith((x, y) => x < y)
