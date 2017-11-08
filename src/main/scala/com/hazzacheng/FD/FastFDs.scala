@@ -3,7 +3,6 @@ package com.hazzacheng.FD
 import org.apache.spark.SparkContext
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.rdd.RDD
-import org.apache.spark.storage.StorageLevel
 
 import scala.collection.mutable
 
@@ -20,21 +19,21 @@ object FastFDs {
   var time1 = 0L
 
   def genDiffSets(sc: SparkContext, rdd: RDD[(Array[String], Long)],
-                  colSize: Int): mutable.HashSet[Set[Int]] = {
+                  colSize: Int): Array[Set[Int]] = {
     genAgreeSets(sc, rdd, colSize)
   }
 
-  def genAgreeSets(sc: SparkContext, rdd: RDD[(Array[String], Long)],
-                  colSize: Int): mutable.HashSet[Set[Int]] = {
+  private def genAgreeSets(sc: SparkContext, rdd: RDD[(Array[String], Long)],
+                  colSize: Int): Array[Set[Int]] = {
     val sets = mutable.HashSet.empty[Set[Int]]
     for (i <- 1 to colSize) {
       sets ++= getStripPartitions(sc, rdd, i).collect()
     }
 
-    sets
+    getMC(sc, sets)
   }
 
-  def getStripPartitions(sc: SparkContext, rdd: RDD[(Array[String], Long)],
+  private def getStripPartitions(sc: SparkContext, rdd: RDD[(Array[String], Long)],
              attribute: Int): RDD[Set[Int]] = {
     val partitions = rdd.map(line => (line._1(attribute - 1), List(line._2.toInt)))
       .reduceByKey(_ ++ _).map(_._2.toSet)
@@ -42,16 +41,22 @@ object FastFDs {
     partitions
   }
 
-  def getMC(sc: SparkContext, sets: mutable.HashSet[Set[Int]]) = {
+  private def getMC(sc: SparkContext, sets: mutable.HashSet[Set[Int]]): Array[Set[Int]] = {
     time1 = System.currentTimeMillis()
     val temp = sets.toArray.sortWith((x, y) => x.size > y.size)
     println("===========USE TIME sort: " + (System.currentTimeMillis() - time1))
     val tempBV = sc.broadcast(temp)
-    val mc = sc.parallelize(temp).filter(s => )
+    val mc = sc.parallelize(temp).filter(isBigSet(tempBV, _)).collect()
+
+    mc
   }
 
-  def isBigSet(tempBV: Broadcast[Array[Set[Int]]], s: Set[Int]): Boolean = {
+  private def isBigSet(tempBV: Broadcast[Array[Set[Int]]], s: Set[Int]): Boolean = {
     val arr = tempBV.value
+    for (set <- arr)
+      if ((s & set) == s && s != set) return false
+
+    true
   }
 
 /*  def getAgreeSets(p: List[Array[String]], commonAttr: Int, colSize: Int) = {
