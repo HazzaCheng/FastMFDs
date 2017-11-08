@@ -20,9 +20,12 @@ object Main {
     val output = args(1)
     val (colSize, orders) = FDUtils.getColSizeAndOreders(ss, input)
     val rdd = FDUtils.readAsRdd(sc, input)
-    val res = DependencyDiscovery.findOnSpark(sc, rdd, colSize, orders)
-    val fdMin = FDUtils.outPutFormat(res)
-    sc.parallelize(fdMin).saveAsTextFile(output)
+  //  val res = DependencyDiscovery.findOnSpark(sc, rdd, colSize, orders)
+  //  val fdMin = FDUtils.outPutFormat(res)
+  //  sc.parallelize(fdMin).saveAsTextFile(output)
+
+    val sets = FastFDs.genDiffSets(sc, rdd, colSize, orders: Array[(Int, Long)])
+    print("=========Size sets " + sets.size)
   }
 
 
