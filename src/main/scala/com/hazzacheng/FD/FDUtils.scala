@@ -41,10 +41,14 @@ object FDUtils {
       .map(line => line.split(",").map(word => word.trim()))
   }
 
-  def readAsRddWithIndex(sc: SparkContext, filePath: String): RDD[(Array[String], Long)] = {
-    sc.textFile(filePath, sc.defaultParallelism * 4)
+  def readAsRddWithIndex(sc: SparkContext,
+                         filePath: String): ((RDD[(Array[String], Long)]), Int) = {
+    val rdd = sc.textFile(filePath, sc.defaultParallelism * 4)
       .map(line => line.split(",").map(word => word.trim()))
       .zipWithIndex().persist(StorageLevel.MEMORY_AND_DISK_SER)
+    val colSize = rdd.first()._1.size
+
+    (rdd, colSize)
   }
 
 

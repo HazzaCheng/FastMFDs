@@ -24,8 +24,8 @@ object Main {
     val fdMin = FDUtils.outPutFormat(res)
     sc.parallelize(fdMin).saveAsTextFile(output)*/
 
-    val rddWithIndex = FDUtils.readAsRddWithIndex(sc, input)
-    val sets = FastFDs.genDiffSets(sc, rddWithIndex, 15)
+    val (rddWithIndex, colSize) = FDUtils.readAsRddWithIndex(sc, input)
+    val sets = FastFDs.genDiffSets(sc, rddWithIndex, colSize)
     println("=========Size sets " + sets.size)
   }
 
