@@ -41,8 +41,9 @@ object FastFDs {
     println("====USE TIME get mc: " + (System.currentTimeMillis() - time1))
 
     time1 = System.currentTimeMillis()
-    val rows = getRows(sc, mc)
+    val rows = getRows(mc)
     println("====USE TIME get rows: " + (System.currentTimeMillis() - time1))
+    println("====Size rows: " + rows.length)
 
     time1 = System.currentTimeMillis()
     val ecMap = getAllEc(sc, stripped, rows)
@@ -77,7 +78,7 @@ object FastFDs {
     println("====USE TIME sort: " + (System.currentTimeMillis() - time1))
     val tempBV = sc.broadcast(temp)
     val mc = sc.parallelize(0 until n).filter(isBigSet(tempBV, _)).collect().map(x => temp(x))
-    println("====Size mc" + mc.length)
+    println("====Size mc: " + mc.length)
     tempBV.unpersist()
 
     mc.map(x => x._2)
@@ -126,10 +127,9 @@ object FastFDs {
     list.toList
   }
 
-  private def getRows(sc: SparkContext,
-                      mc: Array[Set[Int]]): Array[Int] = {
-//    val rows = mc.flatMap(_.toList)
-    val rows = sc.parallelize(mc).flatMap(_.toList).collect()
+  private def getRows(mc: Array[Set[Int]]): Array[Int] = {
+    val rows = mc.flatMap(_.toList)
+//    val rows = sc.parallelize(mc).flatMap(_.toList).collect()
     rows.distinct
   }
 
