@@ -6,6 +6,7 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.storage.StorageLevel
 
 import scala.collection.mutable
+import scala.util.control.Breaks
 
 /**
   * Created with IntelliJ IDEA.
@@ -35,13 +36,25 @@ object FastFDs {
       stripped(i - 1) = temp
       sets ++= temp
     }
-    val mc = getMC(sc, sets)
     time1 = System.currentTimeMillis()
-    val rows = getRows(mc)
+    val mc = getMC(sc, sets)
+    println("====USE TIME get mc: " + (System.currentTimeMillis() - time1))
+
+    time1 = System.currentTimeMillis()
+    val rows = getRows(sc, mc)
     println("====USE TIME get rows: " + (System.currentTimeMillis() - time1))
+
+    time1 = System.currentTimeMillis()
     val ecMap = getAllEc(sc, stripped, rows)
+    println("====USE TIME get ec map: " + (System.currentTimeMillis() - time1))
+
+    time1 = System.currentTimeMillis()
     val couplesRdd = getAllCouples(sc, mc)
+    println("====USE TIME get couples: " + (System.currentTimeMillis() - time1))
+
+    time1 = System.currentTimeMillis()
     val ag = getAg(sc, couplesRdd, ecMap)
+    println("====USE TIME get ag: " + (System.currentTimeMillis() - time1))
     println("====Size ag sets: " + ag.size)
 
     ag
@@ -60,20 +73,36 @@ object FastFDs {
                     sets: mutable.HashSet[Set[Int]]): Array[Set[Int]] = {
     time1 = System.currentTimeMillis()
     val temp = sets.toArray.map(x => (x.size, x)).sortWith((x, y) => x._1 > y._1)
+    val n = temp.length
     println("====USE TIME sort: " + (System.currentTimeMillis() - time1))
     val tempBV = sc.broadcast(temp)
-    val mc = sc.parallelize(temp).filter(isBigSet(tempBV, _)).collect()
+    val mc = sc.parallelize(0 until n).filter(isBigSet(tempBV, _)).collect().map(x => temp(x))
     println("====Size mc" + mc.length)
+    tempBV.unpersist()
+
     mc.map(x => x._2)
   }
 
   private def isBigSet(tempBV: Broadcast[Array[(Int,Set[Int])]],
-                       s: (Int,Set[Int])): Boolean = {
+                       index: Int): Boolean = {
     val arr = tempBV.value
+    val s = arr(index)
     for (set <- arr) {
-      if(s._1 <= set._1) {
-        if ((s._2 & set._2) == s && s != set) return false
+      if(s._1 < set._1) {
+        //if ((s._2 & set._2) == s) return false
+        val loop = new Breaks
+        var flag = true
+        loop.breakable(
+          for(elem <- s._2){
+            if(!set._2.contains(elem)){
+              flag = false
+              loop.break()
+            }
+          }
+        )
+        if(flag) return false
       }
+      else return true
     }
     true
   }
@@ -97,9 +126,10 @@ object FastFDs {
     list.toList
   }
 
-  private def getRows(mc: Array[Set[Int]]): Array[Int] = {
-    val rows = mc.flatMap(_.toList)
-
+  private def getRows(sc: SparkContext,
+                      mc: Array[Set[Int]]): Array[Int] = {
+//    val rows = mc.flatMap(_.toList)
+    val rows = sc.parallelize(mc).flatMap(_.toList).collect()
     rows.distinct
   }
 
@@ -112,6 +142,7 @@ object FastFDs {
     time1 = System.currentTimeMillis()
     ec.foreach(x => ecMap.put(x._1, x._2))
     println("====USE TIME get ec: " + (System.currentTimeMillis() - time1))
+    strippedBV.unpersist()
 
     ecMap
   }
@@ -142,6 +173,7 @@ object FastFDs {
                     ecMap: mutable.HashMap[Int, Set[(Int, Int)]]): Set[Set[Int]] = {
     val ecMapBV = sc.broadcast(ecMap)
     val ag = couplesRdd.map(couple => getCommon(ecMapBV, couple._1, couple._2)).collect()
+    ecMapBV.unpersist()
 
     ag.toSet
   }
