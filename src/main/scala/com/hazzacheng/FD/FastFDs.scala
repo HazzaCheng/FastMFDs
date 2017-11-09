@@ -32,8 +32,8 @@ object FastFDs {
       striped(i - 1) = temp.zipWithIndex
       sets ++= temp
     }
-
-    getMC(sc, sets)
+    val mc = getMC(sc, sets)
+    val couplesRdd = getAllCouples(sc, mc)
   }
 
   private def getStripPartitions(sc: SparkContext, rdd: RDD[(Array[String], Long)],
@@ -62,6 +62,24 @@ object FastFDs {
       }
     }
     true
+  }
+
+  private def getAllCouples(sc: SparkContext,
+                            mc: Array[Set[Int]]): RDD[scala.List[(Int, Int)]] = {
+    val couples = sc.parallelize(mc).map(set => getCouples(set)).distinct()
+
+    couples
+  }
+
+  private def getCouples(set: Set[Int]): List[(Int, Int)] = {
+    val arr = set.toArray.sorted
+    val len = arr.length
+    val list = mutable.ListBuffer.empty[(Int, Int)]
+    for (i <- 0 until len)
+      for (j <- i + 1 until len)
+        list.append((arr(i), arr(j)))
+
+    list.toList
   }
 
 /*  def getAgreeSets(p: List[Array[String]], commonAttr: Int, colSize: Int) = {
