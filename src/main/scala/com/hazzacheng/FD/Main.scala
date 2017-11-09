@@ -26,7 +26,7 @@ object Main {
 
     val (rddWithIndex, colSize) = FDUtils.readAsRddWithIndex(sc, input)
     val sets = FastFDs.genDiffSets(sc, rddWithIndex, colSize)
-    println("=========Size sets " + sets.size)
+//    println("=========Size sets " + sets.size)
   }
 
 

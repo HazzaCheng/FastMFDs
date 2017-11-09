@@ -22,13 +22,13 @@ object FastFDs {
 
   def genDiffSets(sc: SparkContext,
                   rdd: RDD[(Array[String], Long)],
-                  colSize: Int): Set[Set[Int]] = {
+                  colSize: Int): Unit/*Set[Set[Int]] */= {
     genAgreeSets(sc, rdd, colSize)
   }
 
   private def genAgreeSets(sc: SparkContext,
                            rdd: RDD[(Array[String], Long)],
-                           colSize: Int): Set[Set[Int]] = {
+                           colSize: Int): Unit/*Set[Set[Int]]*/ = {
     val sets = mutable.HashSet.empty[Set[Int]]
     val stripped = new Array[Array[Set[Int]]](colSize)
     for (i <- 1 to colSize) {
@@ -45,7 +45,7 @@ object FastFDs {
     println("====USE TIME get rows: " + (System.currentTimeMillis() - time1))
     println("====Size rows: " + rows.length)
 
-    time1 = System.currentTimeMillis()
+    /*time1 = System.currentTimeMillis()
     val ecMap = getAllEc(sc, stripped, rows)
     println("====USE TIME get ec map: " + (System.currentTimeMillis() - time1))
 
@@ -58,7 +58,7 @@ object FastFDs {
     println("====USE TIME get ag: " + (System.currentTimeMillis() - time1))
     println("====Size ag sets: " + ag.size)
 
-    ag
+    ag*/
   }
 
   private def getStripPartitions(sc: SparkContext,
