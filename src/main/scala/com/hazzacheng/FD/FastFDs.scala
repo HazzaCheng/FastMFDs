@@ -37,7 +37,7 @@ object FastFDs {
       sets ++= temp
     }
     time1 = System.currentTimeMillis()
-    val mc = getMC(sc, sets)
+    val mc = getMC(sets)
     println("====USE TIME get mc: " + (System.currentTimeMillis() - time1))
 
     time1 = System.currentTimeMillis()
@@ -70,42 +70,39 @@ object FastFDs {
     partitions
   }
 
-  private def getMC(sc: SparkContext,
-                    sets: mutable.HashSet[Set[Int]]): Array[Set[Int]] = {
-    time1 = System.currentTimeMillis()
-    val temp = sets.toArray.map(x => (x.size, x)).sortWith((x, y) => x._1 > y._1)
-    val n = temp.length
-    println("====USE TIME sort: " + (System.currentTimeMillis() - time1))
-    val tempBV = sc.broadcast(temp)
-    val mc = sc.parallelize(0 until n).filter(isBigSet(tempBV, _)).collect().map(x => temp(x))
-    println("====Size mc: " + mc.length)
-    tempBV.unpersist()
-
-    mc.map(x => x._2)
-  }
-
-  private def isBigSet(tempBV: Broadcast[Array[(Int,Set[Int])]],
-                       index: Int): Boolean = {
-    val arr = tempBV.value
-    val s = arr(index)
-    for (set <- arr) {
-      if(s._1 < set._1) {
-        //if ((s._2 & set._2) == s) return false
-        val loop = new Breaks
-        var flag = true
-        loop.breakable(
-          for(elem <- s._2){
-            if(!set._2.contains(elem)){
-              flag = false
-              loop.break()
+  private def getMC(sets: mutable.HashSet[Set[Int]]): Array[Set[Int]] = {
+    val temp = sets.toArray.map(x => (x.size, x)).sortWith((x,y) => x._1 > y._1)
+    val order = temp.indices
+    val res = mutable.ListBuffer.empty[Set[Int]]
+    for(i <- order){
+      var j = 0
+      var f = true
+      val loop_ = new Breaks
+      loop_.breakable(
+        while(j < i){
+          val loop = new Breaks
+          var flag = true
+          loop.breakable(
+            for(elem <- temp(i)._2){
+              if(!temp(j)._2.contains(elem)){
+                flag = false
+                loop.break()
+              }
             }
+          )
+          if(flag){
+            f = false
+            loop_.break()
           }
-        )
-        if(flag) return false
+          j += 1
+        }
+      )
+      if(f){
+        res += temp(i)._2
       }
-      else return true
     }
-    true
+    println("======MC: " + res.toList.length + "===================")
+    res.toArray
   }
 
   private def getAllCouples(sc: SparkContext,
