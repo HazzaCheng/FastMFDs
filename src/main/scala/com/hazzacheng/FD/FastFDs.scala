@@ -45,14 +45,14 @@ object FastFDs {
     println("====USE TIME get rows: " + (System.currentTimeMillis() - time1))
 
 
-    /*time1 = System.currentTimeMillis()
-    val ecMap = getAllEc(sc, stripped, rows)
-    println("====USE TIME get ec map: " + (System.currentTimeMillis() - time1))*/
+    time1 = System.currentTimeMillis()
+    val ecMap = getAllEc(sc, stripped, rowsLen)
+    println("====USE TIME get ec map: " + (System.currentTimeMillis() - time1))
 
     time1 = System.currentTimeMillis()
     val couples = getAllCouples(sc, mc)
     println("====USE TIME get couples: " + (System.currentTimeMillis() - time1))
-    println("====Size couples: " + couples.length)
+    println("====Size couples: " + couples.count())
 
     /*
     time1 = System.currentTimeMillis()
@@ -108,10 +108,10 @@ object FastFDs {
   }
 
   private def getAllCouples(sc: SparkContext,
-                            mc: Array[Set[Int]]): Array[(Int, Int)] = {
-//    val couples = sc.parallelize(mc).flatMap(set => getCouples(set))
-//      .distinct().persist(StorageLevel.MEMORY_AND_DISK_SER)
-    val couples = mc.flatMap(set => getCouples(set))
+                            mc: Array[Set[Int]]): RDD[(Int, Int)] = {
+    val couples = sc.parallelize(mc).flatMap(set => getCouples(set))
+      .distinct().persist(StorageLevel.MEMORY_AND_DISK_SER)
+//    val couples = mc.flatMap(set => getCouples(set))
     couples
   }
 
@@ -148,13 +148,41 @@ object FastFDs {
 
   private def getAllEc(sc: SparkContext,
                        stripped: Array[Array[Set[Int]]],
-                       rows: Int) = {
-    sc.parallelize(stripped).map()
+                       rowsLen: Int): Array[Set[(Int, Int)]] = {
+    val strippedWithIndex = stripped.zipWithIndex
+    val ec = sc.parallelize(strippedWithIndex).map(p => getEc(p, rowsLen)).collect()
+    val ecArr = new Array[mutable.HashSet[(Int, Int)]](rowsLen)
+    Range(0, rowsLen).foreach(i => combineEc(ec, ecArr, i))
+    ecArr.map(_.toSet)
   }
 
-  private def getEc(partition: Array[Set[Int]], rows: Int) = {
+  private def getEc(partition: (Array[Set[Int]], Int),
+                    rows: Int): (Array[Int], Int) = {
     val ec = new Array[Int](rows)
+    val len = partition._1.length
+    Range(0, len).foreach(i => {
+      var j = 0
+      var nonFind = true
+      while (nonFind && j < len) {
+        if (partition._1(j) contains i) {
+          ec(i) = j
+          nonFind = false
+          j += 1
+        }
+      }
+      if (j == len) ec(i) = -1
+    })
 
+    (ec, partition._2)
+  }
+
+  def combineEc(ec: Array[(Array[Int], Int)],
+                ecArr: Array[mutable.HashSet[(Int, Int)]],
+                i: Int): Unit = {
+    ec.foreach(x => {
+      val tmp = x._1(i)
+      if (tmp != -1) ecArr(i).add((tmp, x._2))
+    })
   }
 
 /*  private def getEc(strippedBV: Broadcast[Array[Array[Set[Int]]]],
