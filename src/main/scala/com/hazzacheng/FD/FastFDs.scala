@@ -41,23 +41,25 @@ object FastFDs {
     println("====USE TIME get mc: " + (System.currentTimeMillis() - time1))
 
     time1 = System.currentTimeMillis()
-    val rows = getRows(mc)
+    val rowsLen = mc.map(_.size).sum
     println("====USE TIME get rows: " + (System.currentTimeMillis() - time1))
-    println("====Size rows: " + rows.length)
 
-    time1 = System.currentTimeMillis()
+
+    /*time1 = System.currentTimeMillis()
     val ecMap = getAllEc(sc, stripped, rows)
-    println("====USE TIME get ec map: " + (System.currentTimeMillis() - time1))
+    println("====USE TIME get ec map: " + (System.currentTimeMillis() - time1))*/
 
     time1 = System.currentTimeMillis()
-    val couplesRdd = getAllCouples(sc, mc)
+    val couples = getAllCouples(sc, mc)
     println("====USE TIME get couples: " + (System.currentTimeMillis() - time1))
+    println("====Size couples: " + couples.length)
 
+    /*
     time1 = System.currentTimeMillis()
     val ag = getAg(sc, couplesRdd, ecMap)
     println("====USE TIME get ag: " + (System.currentTimeMillis() - time1))
-    println("====Size ag sets: " + ag.size)
-
+    println("====Size ag sets: " + ag.size)*/
+    val ag: Set[Set[Int]] = Set(Set(1))
     ag
   }
 
@@ -101,15 +103,15 @@ object FastFDs {
         res += temp(i)._2
       }
     }
-    println("======MC: " + res.toList.length + "===================")
+    println("====MC: " + res.toList.length)
     res.toArray
   }
 
   private def getAllCouples(sc: SparkContext,
-                            mc: Array[Set[Int]]): RDD[(Int, Int)] = {
-    val couples = sc.parallelize(mc).flatMap(set => getCouples(set))
-      .distinct().persist(StorageLevel.MEMORY_AND_DISK_SER)
-
+                            mc: Array[Set[Int]]): Array[(Int, Int)] = {
+//    val couples = sc.parallelize(mc).flatMap(set => getCouples(set))
+//      .distinct().persist(StorageLevel.MEMORY_AND_DISK_SER)
+    val couples = mc.flatMap(set => getCouples(set))
     couples
   }
 
@@ -130,7 +132,7 @@ object FastFDs {
     rows.distinct
   }
 
-  private def getAllEc(sc: SparkContext,
+/*  private def getAllEc(sc: SparkContext,
                        stripped: Array[Array[Set[Int]]],
                        rows: Array[Int]): mutable.HashMap[Int, Set[(Int, Int)]] = {
     val strippedBV = sc.broadcast(stripped)
@@ -142,9 +144,20 @@ object FastFDs {
     strippedBV.unpersist()
 
     ecMap
+  }*/
+
+  private def getAllEc(sc: SparkContext,
+                       stripped: Array[Array[Set[Int]]],
+                       rows: Int) = {
+    sc.parallelize(stripped).map()
   }
 
-  private def getEc(strippedBV: Broadcast[Array[Array[Set[Int]]]],
+  private def getEc(partition: Array[Set[Int]], rows: Int) = {
+    val ec = new Array[Int](rows)
+
+  }
+
+/*  private def getEc(strippedBV: Broadcast[Array[Array[Set[Int]]]],
                     r: Int): (Int, Set[(Int, Int)]) = {
     val stripped = strippedBV.value
     val res = mutable.ListBuffer.empty[(Int, Int)]
@@ -163,7 +176,7 @@ object FastFDs {
     }
 
     (r, res.toSet)
-  }
+  }*/
 
   private def getAg(sc: SparkContext,
                     couplesRdd: RDD[(Int, Int)],
