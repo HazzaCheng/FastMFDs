@@ -2,6 +2,8 @@ package com.hazzacheng.FD
 
 import org.scalatest.FunSuite
 
+import scala.collection.mutable
+
 /**
   * Created with IntelliJ IDEA.
   *

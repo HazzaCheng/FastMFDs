@@ -146,15 +146,15 @@ object FastFDs {
     ecMap
   }*/
 
-  private def getAllEc(sc: SparkContext,
-                       stripped: Array[Array[Set[Int]]],
-                       rowsLen: Int): Array[Set[(Int, Int)]] = {
-    val strippedWithIndex = stripped.zipWithIndex
-    val ec = sc.parallelize(strippedWithIndex).map(p => getEc(p, rowsLen)).collect()
-    val ecArr = new Array[mutable.HashSet[(Int, Int)]](rowsLen)
-    Range(0, rowsLen).foreach(i => combineEc(ec, ecArr, i))
-    ecArr.map(_.toSet)
-  }
+//  private def getAllEc(sc: SparkContext,
+//                       stripped: Array[Array[Set[Int]]],
+//                       rowsLen: Int): Array[Set[(Int, Int)]] = {
+//    val strippedWithIndex = stripped.zipWithIndex
+//    val ec = sc.parallelize(strippedWithIndex).map(p => getEc(p, rowsLen)).collect()
+//    val ecArr = new Array[mutable.HashSet[(Int, Int)]](rowsLen)
+//    Range(0, rowsLen).foreach(i => combineEc(ec, ecArr, i))
+//    ecArr.map(_.toSet)
+//  }
 
   private def getEc(partition: (Array[Set[Int]], Int),
                     rows: Int): (Array[Int], Int) = {
@@ -176,35 +176,60 @@ object FastFDs {
     (ec, partition._2)
   }
 
-  def combineEc(ec: Array[(Array[Int], Int)],
-                ecArr: Array[mutable.HashSet[(Int, Int)]],
-                i: Int): Unit = {
-    ec.foreach(x => {
-      val tmp = x._1(i)
-      if (tmp != -1) ecArr(i).add((tmp, x._2))
-    })
+//  def combineEc(ec: Array[(Array[Int], Int)],
+//                ecArr: Array[mutable.HashSet[(Int, Int)]],
+//                i: Int): Unit = {
+//    ec.foreach(x => {
+//      val tmp = x._1(i)
+//      if (tmp != -1) ecArr(i).add((tmp, x._2))
+//    })
+//  }
+
+  private def getAllEc(sc: SparkContext,
+                       stripped: Array[Array[Set[Int]]],
+                       rowsLen: Int): Array[Array[(Int, Int)]] = {
+    val strippedNum = stripped.length
+    val strippedDict = sc.parallelize(stripped.zipWithIndex, strippedNum).map(x => (x._2, buildStrippedDict(x._1))).collect().sortWith((x, y) => x._1 < y._1).map(x => x._2)
+    val strippedDictBV = sc.broadcast(strippedDict)
+    val data = stripped(0).flatten
+    val res = sc.parallelize(data).map(x => getEc(x, strippedDictBV)).collect()
+    res
   }
 
-/*  private def getEc(strippedBV: Broadcast[Array[Array[Set[Int]]]],
-                    r: Int): (Int, Set[(Int, Int)]) = {
-    val stripped = strippedBV.value
+  def buildStrippedDict(arr: Array[Set[Int]]): mutable.HashMap[Int, Int] = {
+    val dict = mutable.HashMap.empty[Int, Int]
+    arr.zipWithIndex.foreach(set => set._1.foreach(x => dict += x -> set._2))
+    dict
+  }
+
+  def getEc(x: Int, dict: Broadcast[Array[mutable.HashMap[Int, Int]]]):Array[(Int, Int)] ={
     val res = mutable.ListBuffer.empty[(Int, Int)]
-    val len1 = stripped.length
-    for (i <- 0 until len1) {
-      val len2 = stripped(i).length
-      var nonFind = true
-      var j = 0
-      while (nonFind && j < len2) {
-        if (stripped(i)(j) contains r) {
-          res.append((i + 1, j))
-          j += 1
-          nonFind = false
+    val d = dict.value
+    for(i <- d.indices){
+      res += x -> (d(i)(x) + 1)
+    }
+    res.toArray
+  }
+  /*  private def getEc(strippedBV: Broadcast[Array[Array[Set[Int]]]],
+                      r: Int): (Int, Set[(Int, Int)]) = {
+      val stripped = strippedBV.value
+      val res = mutable.ListBuffer.empty[(Int, Int)]
+      val len1 = stripped.length
+      for (i <- 0 until len1) {
+        val len2 = stripped(i).length
+        var nonFind = true
+        var j = 0
+        while (nonFind && j < len2) {
+          if (stripped(i)(j) contains r) {
+            res.append((i + 1, j))
+            j += 1
+            nonFind = false
+          }
         }
       }
-    }
 
-    (r, res.toSet)
-  }*/
+      (r, res.toSet)
+    }*/
 
   private def getAg(sc: SparkContext,
                     couplesRdd: RDD[(Int, Int)],
