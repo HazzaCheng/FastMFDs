@@ -270,6 +270,27 @@ object FDUtils {
     res.map(rhs => (lhs, rhs)).toList
   }
 
+  def check_true(data: List[Array[String]],
+            lhs: Set[Int],
+            rhs: mutable.Set[Int]): List[(Set[Int],Int)] ={
+    //val lSize = data.map(d => (FDUtils.takeAttributes(d, lhs),d)).groupBy(_._1).size
+    val true_rhs = rhs.clone()
+    val dict = mutable.HashMap.empty[String, Array[String]]
+    data.foreach(d => {
+      val left = takeAttrLHS(d, lhs)
+      val right = takeAttrRHS(d, rhs)
+      if(dict.contains(left)){
+        for(i <- true_rhs){
+          if(!dict(left)(i).equals(right(i))){
+            true_rhs -= i
+          }
+        }
+      }
+      else dict += left -> right
+    })
+
+    true_rhs.map(rhs => (lhs, rhs)).toList
+  }
 
 //  def cut(map: mutable.HashMap[Set[Int], mutable.Set[Int]],
 //          lhs: Set[Int], rhs: Int) = {

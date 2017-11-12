@@ -123,6 +123,15 @@ class FDUtilsTest extends FunSuite {
     //fd.foreach(println)
   }
 
+  test("checc"){
+    val time = System.currentTimeMillis()
+    for(i <- 0 until 20000000){
+      println(i + "\t\t")
+    }
+    println("Time: " + (System.currentTimeMillis() - time))
+  }
+
+
 //  test("check"){
 //    val data = List(Array("a","p","c","d"),Array("a","d","c","l"),Array("a","r","c","x"),
 //    Array("a","b","c","n"))
