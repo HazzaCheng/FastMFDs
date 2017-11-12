@@ -1,5 +1,6 @@
 package com.hazzacheng.FD
 
+import com.hazzacheng.FD.FDUtils.{takeAttrLHS, takeAttrRHS}
 import org.apache.spark.SparkContext
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.rdd.RDD
@@ -24,10 +25,10 @@ object FDsMine {
   var time2 = System.currentTimeMillis()
 
   def findOnSpark(sc: SparkContext, rdd: RDD[Array[String]],
-                  colSize: Int, orders: Array[(Int, Long)]): Map[Set[Int], mutable.Set[Int]] = {
+                  colSize: Int, orders: Array[(Int, Long)]): Map[Set[Int], List[Int]] = {
     val dependencies = FDUtils.getDependencies(colSize)
     val emptyFD = mutable.Set.empty[Int]
-    val results = mutable.HashMap.empty[Set[Int], mutable.Set[Int]]
+    val results = mutable.ListBuffer.empty[(Set[Int], Int)]
 
     var sum = 0
     for (i <- orders) {
@@ -47,31 +48,26 @@ object FDsMine {
         if (fds.nonEmpty) {
           val successed = ListBuffer.empty[(Set[Int], Int)]
           time1 = System.currentTimeMillis()
-          checkPartitions(sc, partitionsRDD, fds, successed)
-          println("===========Paritions Small" + i + " " + k + " Use Time=============" + (System.currentTimeMillis() - time1))
+          checkPartitions(sc, partitionsRDD, fds, results)
+          println("===========Paritions " + i + " " + k + " Use Time=============" + (System.currentTimeMillis() - time1))
 
           time1 = System.currentTimeMillis()
-          println("========Size- failed:"  + i + " " + k + " " + failed.size)
-          if (failed.nonEmpty) {
-            val leaves = cutLeaves(dependencies, candidates, failed.toList, i._1)
+          println("========Size- successed:"  + i + " " + k + " " + successed.size)
+          if (successed.nonEmpty) {
+            val leaves = cutLeaves(dependencies, candidates, successed.toList, i._1)
             println("===========Size- reduce leaves " + i + " " + k + " " + leaves)
             println("===========Cut Leaves" + k + " Use Time=============" + System.currentTimeMillis() + " " + time1 + " " + (System.currentTimeMillis() - time1))
           }
         }
       }
 
-      results ++= candidates
       println("===========Common Attr" + i + " Use Time=============" + (System.currentTimeMillis() - time2))
     }
-    println("============Tasks============" + sum + "======================")
-    time1 = System.currentTimeMillis()
-    val minFD = DependencyDiscovery.findMinFD(sc, results)
-    println("===========FindMinFD Use Time=============" + System.currentTimeMillis() + " " + time1 + " " +(System.currentTimeMillis() - time1))
-    if (emptyFD.nonEmpty) results += (Set.empty[Int] -> emptyFD)
+    if (emptyFD.nonEmpty)
+      emptyFD.foreach(rhs => results.append((Set.empty[Int], rhs)))
 
-    minFD
+    results.toList.groupBy(_._1).map(x => (x._1, x._2.map(_._2)))
   }
-
 
   def repart(sc: SparkContext,
              rdd: RDD[Array[String]],
@@ -85,39 +81,43 @@ object FDsMine {
   def checkPartitions(sc: SparkContext,
                       partitionsRDD: RDD[List[Array[String]]],
                       fds: List[(Set[Int], mutable.Set[Int])],
-                      successed: ListBuffer[(Set[Int], Int)]): Unit = {
+                      res: mutable.ListBuffer[(Set[Int], Int)]): Unit = {
     val successedFD = mutable.ListBuffer.empty[(Set[Int], Int)]
     val fdsBV = sc.broadcast(fds)
-    val minimalFDs = partitionsRDD.map(p => checkFDs(fdsBV, p)).collect()
+    val minimalFDs = partitionsRDD.flatMap(p => checkFDs(fdsBV, p)).collect().distinct
 
-    tupleInfo.foreach(tuple => {
-      dict.put(tuple._2, tuple._3)
-      failedFD ++= tuple._1
-    })
-    failed ++= failedFD.toList.distinct
+    res ++= minimalFDs
     fdsBV.unpersist()
-
   }
 
-  def checkFDs(fdsBV: Broadcast[mutable.HashMap[Set[Int], mutable.Set[Int]]],
+  def checkFDs(fdsBV: Broadcast[List[(Set[Int], mutable.Set[Int])]],
                partition: List[Array[String]]
-              ): (List[(Set[Int], Int)], String, mutable.HashMap[Set[Int], Int]) = {
+              ): List[(Set[Int], Int)] = {
     val failed = mutable.ListBuffer.empty[(Set[Int],Int)]
-    val res = fdsBV.value.toList.map(fd =>
-      FDUtils.checkEach(partition, fd._1, fd._2))
-    res.foreach(r => {
-      failed ++= r._1
-      dict.put(r._2._1, r._2._2)
-    })
-    (failed.toList.distinct, partition._1, dict)
-//    val res = FDUtils.checkAll(partition._2, fdsBV.value, map)
-//    (res._1, partition._1, res._2)
+    val minimalFDs = fdsBV.value.toList.flatMap(fd => check(partition, fd._1, fd._2))
+
+    minimalFDs
   }
 
   def check(partition: List[Array[String]],
             lhs: Set[Int],
-            rhs: Set[Int]): List[(Set[Int], Int)] = {
+            rhs: mutable.Set[Int]): List[(Set[Int], Int)] = {
+    val true_rhs = rhs.clone()
+    val dict = mutable.HashMap.empty[String, Array[String]]
+    partition.foreach(d => {
+      val left = takeAttrLHS(d, lhs)
+      val right = takeAttrRHS(d, rhs)
+      if(dict.contains(left)){
+        for(i <- true_rhs){
+          if(!dict(left)(i).equals(right(i))){
+            true_rhs -= i
+          }
+        }
+      }
+      else dict += left -> right
+    })
 
+    true_rhs.map(rhs => (lhs, rhs)).toList
   }
 
   def cutLeaves(dependencies: mutable.HashMap[Set[Int], mutable.Set[Int]],

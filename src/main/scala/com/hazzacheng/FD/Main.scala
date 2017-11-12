@@ -20,8 +20,8 @@ object Main {
     val output = args(1)
     val (colSize, orders) = FDUtils.getColSizeAndOreders(ss, input)
     val rdd = FDUtils.readAsRdd(sc, input)
-    val res = DependencyDiscovery.findOnSpark(sc, rdd, colSize, orders)
-    val fdMin = FDUtils.outPutFormat(res)
+    val res = FDsMine.findOnSpark(sc, rdd, colSize, orders)
+    val fdMin = FDUtils.outPutFormat2(res)
     sc.parallelize(fdMin).saveAsTextFile(output)
 
 /*    val (rddWithIndex, colSize) = FDUtils.readAsRddWithIndex(sc, input)

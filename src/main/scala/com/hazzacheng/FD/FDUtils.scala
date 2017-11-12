@@ -58,6 +58,11 @@ object FDUtils {
     + ":" + d._2.toList.sorted.map(x => "column" + x).mkString(",")).toList
   }
 
+  def outPutFormat2(minFD: Map[Set[Int], List[Int]]): List[String] = {
+    minFD.map(d => d._1.toList.sorted.map(x => "column" + x).mkString("[", ",", "]")
+      + ":" + d._2.sorted.map(x => "column" + x).mkString(",")).toList
+  }
+
   def getDependencies(num: Int): mutable.HashMap[Set[Int], mutable.Set[Int]]= {
     val dependencies = mutable.HashMap.empty[Set[Int], mutable.Set[Int]]
     for (i <- 1 to num) {
@@ -121,8 +126,6 @@ object FDUtils {
     }
     sameLHS
   }
-
-  def get
 
   def cutInSameLhs(sameLHS: mutable.HashMap[Set[Int], mutable.Set[Int]],
                    failFD: List[(Set[Int], Int)]): mutable.HashMap[Set[Int], mutable.Set[Int]] = {
@@ -270,27 +273,6 @@ object FDUtils {
     res.map(rhs => (lhs, rhs)).toList
   }
 
-  def check_true(data: List[Array[String]],
-            lhs: Set[Int],
-            rhs: mutable.Set[Int]): List[(Set[Int],Int)] ={
-    //val lSize = data.map(d => (FDUtils.takeAttributes(d, lhs),d)).groupBy(_._1).size
-    val true_rhs = rhs.clone()
-    val dict = mutable.HashMap.empty[String, Array[String]]
-    data.foreach(d => {
-      val left = takeAttrLHS(d, lhs)
-      val right = takeAttrRHS(d, rhs)
-      if(dict.contains(left)){
-        for(i <- true_rhs){
-          if(!dict(left)(i).equals(right(i))){
-            true_rhs -= i
-          }
-        }
-      }
-      else dict += left -> right
-    })
-
-    true_rhs.map(rhs => (lhs, rhs)).toList
-  }
 
 //  def cut(map: mutable.HashMap[Set[Int], mutable.Set[Int]],
 //          lhs: Set[Int], rhs: Int) = {
