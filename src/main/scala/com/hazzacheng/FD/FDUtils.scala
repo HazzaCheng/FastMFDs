@@ -117,10 +117,12 @@ object FDUtils {
     val sameLHS = mutable.HashMap.empty[Set[Int], mutable.Set[Int]]
     for (lhs <- ls) {
       val rs = candidates.getOrElse(lhs, null)
-      if (rs != null && rs.nonEmpty) sameLHS.update(lhs, rs)
+      if (rs != null && rs.nonEmpty) sameLHS.put(lhs, rs)
     }
     sameLHS
   }
+
+  def get
 
   def cutInSameLhs(sameLHS: mutable.HashMap[Set[Int], mutable.Set[Int]],
                    failFD: List[(Set[Int], Int)]): mutable.HashMap[Set[Int], mutable.Set[Int]] = {

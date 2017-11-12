@@ -45,15 +45,14 @@ object FastFDs {
     println("====USE TIME get rows: " + (System.currentTimeMillis() - time1))
 
 
-    time1 = System.currentTimeMillis()
+  /*  time1 = System.currentTimeMillis()
     val ecMap = getAllEc(sc, stripped, rowsLen)
     println("====USE TIME get ec map: " + (System.currentTimeMillis() - time1))
-
+*/
     time1 = System.currentTimeMillis()
     val couples = getAllCouples(sc, mc)
     println("====USE TIME get couples: " + (System.currentTimeMillis() - time1))
     println("====Size couples: " + couples.count())
-
     /*
     time1 = System.currentTimeMillis()
     val ag = getAg(sc, couplesRdd, ecMap)
@@ -157,10 +156,10 @@ object FastFDs {
 //  }
 
   private def getEc(partition: (Array[Set[Int]], Int),
-                    rows: Int): (Array[Int], Int) = {
-    val ec = new Array[Int](rows)
+                    rowsLen: Int): (Array[Int], Int) = {
+    val ec = new Array[Int](rowsLen)
     val len = partition._1.length
-    Range(0, len).foreach(i => {
+    Range(0, rowsLen).foreach(i => {
       var j = 0
       var nonFind = true
       while (nonFind && j < len) {
@@ -171,6 +170,7 @@ object FastFDs {
         }
       }
       if (j == len) ec(i) = -1
+      println("===== " + i + " " + j)
     })
 
     (ec, partition._2)
