@@ -18,15 +18,15 @@ object Main {
     val sc = ss.sparkContext
     val input = args(0)
     val output = args(1)
-  /*  val (colSize, orders) = FDUtils.getColSizeAndOreders(ss, input)
+    val (colSize, orders) = FDUtils.getColSizeAndOreders(ss, input)
     val rdd = FDUtils.readAsRdd(sc, input)
     val res = DependencyDiscovery.findOnSpark(sc, rdd, colSize, orders)
     val fdMin = FDUtils.outPutFormat(res)
-    sc.parallelize(fdMin).saveAsTextFile(output)*/
+    sc.parallelize(fdMin).saveAsTextFile(output)
 
-    val (rddWithIndex, colSize) = FDUtils.readAsRddWithIndex(sc, input)
+/*    val (rddWithIndex, colSize) = FDUtils.readAsRddWithIndex(sc, input)
     val sets = FastFDs.genDiffSets(sc, rddWithIndex, colSize)
-//    println("=========Size sets " + sets.size)
+    println("=========Size sets " + sets.size)*/
   }
 
 
