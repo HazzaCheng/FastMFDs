@@ -44,25 +44,27 @@ object FDsMine {
       for (k <- keys) {
         val fds = lhsWithSize(k)
 
-        println("========Size- lhs:"  + i + " " + k + " " + fds.size)
+        println("====Size lhs in "  + i + " " + k + " " + fds.size)
 //        println("========Size- depend:"  + i + " " + k + " " + FDUtils.getDependenciesNums(fds))
         if (fds.nonEmpty) {
           val successed = ListBuffer.empty[(Set[Int], Int)]
           time1 = System.currentTimeMillis()
-          successed ++= checkPartitions(sc, partitionsRDD, fds, results, partitionSize)
-          println("===========Paritions " + i + " " + k + " Use Time=============" + (System.currentTimeMillis() - time1))
+          val minimalFDs = checkPartitions(sc, partitionsRDD, fds, results, partitionSize, colSize)
+          println("====Minimal FDs in " + i + " " + k)
+          minimalFDs.foreach(println)
+          successed ++= minimalFDs
+          println("====Paritions in " + i + " " + k + " Use Time=============" + (System.currentTimeMillis() - time1))
 
           time1 = System.currentTimeMillis()
-          println("========Size- successed:"  + i + " " + k + " " + successed.size)
+          println("====Size successed:"  + i + " " + k + " " + successed.size)
           if (successed.nonEmpty) {
-            val leaves = cutLeaves(candidates, successed.toList, i._1)
-            println("===========Size- reduce leaves " + i + " " + k + " " + leaves)
-            println("===========Cut Leaves" + k + " Use Time=============" + System.currentTimeMillis() + " " + time1 + " " + (System.currentTimeMillis() - time1))
+            cutLeaves(candidates, successed.toList, i._1)
+            println("====Cut Leaves in " + k + " Use Time=============" + (System.currentTimeMillis() - time1))
           }
         }
       }
 
-      println("===========Common Attr" + i + " Use Time=============" + (System.currentTimeMillis() - time2))
+      println("====Common Attr in " + i + " Use Time=============" + (System.currentTimeMillis() - time2))
     }
     if (emptyFD.nonEmpty)
       emptyFD.foreach(rhs => results.append((Set.empty[Int], rhs)))
@@ -83,10 +85,10 @@ object FDsMine {
                       partitionsRDD: RDD[List[Array[String]]],
                       fds: List[(Set[Int], mutable.Set[Int])],
                       res: mutable.ListBuffer[(Set[Int], Int)],
-                      partitionSize: Int): Array[(Set[Int], Int)]= {
-    val successedFD = mutable.ListBuffer.empty[(Set[Int], Int)]
+                      partitionSize: Int,
+                      colSize: Int): Array[(Set[Int], Int)] = {
     val fdsBV = sc.broadcast(fds)
-    val candidates = partitionsRDD.flatMap(p => checkFDs(fdsBV, p))
+    val candidates = partitionsRDD.flatMap(p => checkFDs(fdsBV, p, colSize))
       .map(x => (x, 1)).reduceByKey(_ + _).collect()
     val minimalFDs = candidates.filter(_._2 == partitionSize).map(_._1)
 
@@ -96,33 +98,31 @@ object FDsMine {
   }
 
   def checkFDs(fdsBV: Broadcast[List[(Set[Int], mutable.Set[Int])]],
-               partition: List[Array[String]]
-              ): List[(Set[Int], Int)] = {
+               partition: List[Array[String]],
+               colSize: Int): List[(Set[Int], Int)] = {
     val failed = mutable.ListBuffer.empty[(Set[Int],Int)]
-    val minimalFDs = fdsBV.value.toList.flatMap(fd => check(partition, fd._1, fd._2))
+    val minimalFDs = fdsBV.value.flatMap(fd => check(partition, fd._1, fd._2, colSize))
 
     minimalFDs
   }
 
   def check(partition: List[Array[String]],
             lhs: Set[Int],
-            rhs: mutable.Set[Int]): List[(Set[Int], Int)] = {
+            rhs: mutable.Set[Int],
+            colSize: Int): List[(Set[Int], Int)] = {
     val true_rhs = rhs.clone()
     val dict = mutable.HashMap.empty[String, Array[String]]
     partition.foreach(d => {
       val left = takeAttrLHS(d, lhs)
-      val right = takeAttrRHS(d, rhs)
-      if(dict.contains(left)){
-        for(i <- true_rhs){
-          if(!dict(left)(i).equals(right(i))){
-            true_rhs -= i
-          }
-        }
-      }
-      else dict += left -> right
+      val right = takeAttrRHS(d, rhs, colSize)
+      val value = dict.getOrElse(left, null)
+      if (value != null) {
+        for (i <- true_rhs)
+          if (!value(i).equals(right(i))) true_rhs -= i
+      } else dict += left -> right
     })
 
-    true_rhs.map(rhs => (lhs, rhs)).toList
+    true_rhs.map(r => (lhs, r)).toList
   }
 
   def cutLeaves(candidates: mutable.HashMap[Set[Int], mutable.Set[Int]],
@@ -148,6 +148,22 @@ object FDsMine {
       }
     }
 
+  }
+
+  def takeAttrLHS(arr: Array[String],
+                  attributes: Set[Int]): String = {
+    val s = mutable.StringBuilder.newBuilder
+    attributes.foreach(attr => s.append(arr(attr - 1) + " "))
+
+    s.toString()
+  }
+
+  def takeAttrRHS(arr: Array[String],
+                  attributes: mutable.Set[Int],
+                  colSize: Int): Array[String] = {
+    val res = new Array[String](colSize + 1)
+    attributes.foreach(attr => res(attr) = arr(attr - 1))
+    res
   }
 
 }
