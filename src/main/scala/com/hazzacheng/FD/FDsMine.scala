@@ -32,6 +32,7 @@ object FDsMine {
 
     var sum = 0
     for (i <- orders) {
+      val partitionSize = i._2.toInt
       time2 = System.currentTimeMillis()
       val candidates = FDUtils.getCandidateDependencies(dependencies, i._1)
       val lhsWithSize = candidates.toList.groupBy(_._1.size)
@@ -48,13 +49,13 @@ object FDsMine {
         if (fds.nonEmpty) {
           val successed = ListBuffer.empty[(Set[Int], Int)]
           time1 = System.currentTimeMillis()
-          checkPartitions(sc, partitionsRDD, fds, results)
+          successed ++= checkPartitions(sc, partitionsRDD, fds, results, partitionSize)
           println("===========Paritions " + i + " " + k + " Use Time=============" + (System.currentTimeMillis() - time1))
 
           time1 = System.currentTimeMillis()
           println("========Size- successed:"  + i + " " + k + " " + successed.size)
           if (successed.nonEmpty) {
-            val leaves = cutLeaves(dependencies, candidates, successed.toList, i._1)
+            val leaves = cutLeaves(candidates, successed.toList, i._1)
             println("===========Size- reduce leaves " + i + " " + k + " " + leaves)
             println("===========Cut Leaves" + k + " Use Time=============" + System.currentTimeMillis() + " " + time1 + " " + (System.currentTimeMillis() - time1))
           }
@@ -81,13 +82,17 @@ object FDsMine {
   def checkPartitions(sc: SparkContext,
                       partitionsRDD: RDD[List[Array[String]]],
                       fds: List[(Set[Int], mutable.Set[Int])],
-                      res: mutable.ListBuffer[(Set[Int], Int)]): Unit = {
+                      res: mutable.ListBuffer[(Set[Int], Int)],
+                      partitionSize: Int): Array[(Set[Int], Int)]= {
     val successedFD = mutable.ListBuffer.empty[(Set[Int], Int)]
     val fdsBV = sc.broadcast(fds)
-    val minimalFDs = partitionsRDD.flatMap(p => checkFDs(fdsBV, p)).collect().distinct
+    val candidates = partitionsRDD.flatMap(p => checkFDs(fdsBV, p))
+      .map(x => (x, 1)).reduceByKey(_ + _).collect()
+    val minimalFDs = candidates.filter(_._2 == partitionSize).map(_._1)
 
     res ++= minimalFDs
     fdsBV.unpersist()
+    minimalFDs
   }
 
   def checkFDs(fdsBV: Broadcast[List[(Set[Int], mutable.Set[Int])]],
@@ -120,19 +125,29 @@ object FDsMine {
     true_rhs.map(rhs => (lhs, rhs)).toList
   }
 
-  def cutLeaves(dependencies: mutable.HashMap[Set[Int], mutable.Set[Int]],
-                candidates: mutable.HashMap[Set[Int], mutable.Set[Int]],
-                failed: List[(Set[Int], Int)], commonAttr: Int) :Int = {
-    var sum = 0
-    for (d <- failed) {
-      val subSets = FDUtils.getSubsets(d._1.toArray)
-      for (subSet <- subSets) {
-        if (subSet contains commonAttr) sum += FDUtils.cut(candidates, subSet, d._2)
-        else sum += FDUtils.cut(dependencies, subSet, d._2)
-      }
+  def cutLeaves(candidates: mutable.HashMap[Set[Int], mutable.Set[Int]],
+                successed: List[(Set[Int], Int)], commonAttr: Int): Unit = {
+    for (d <- successed) {
+      val lend = d._1.size
+      val lhs = candidates.keys.filter(x => x.size > lend && (x & d._1) == d._1).toList
+      cut(candidates, lhs, d._2)
     }
-    sum
   }
 
+  def cut(candidates: mutable.HashMap[Set[Int], mutable.Set[Int]],
+          lhs: List[Set[Int]],
+          rhs: Int): Unit = {
+    for (l <- lhs) {
+      val value = candidates(l)
+      if (value contains rhs) {
+        if (value.size == 1) candidates.remove(l)
+        else {
+          value.remove(rhs)
+          candidates.update(l, value)
+        }
+      }
+    }
+
+  }
 
 }
