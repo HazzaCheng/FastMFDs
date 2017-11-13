@@ -91,7 +91,8 @@ object FDsMine {
     val candidates = partitionsRDD.flatMap(p => checkFDs(fdsBV, p, colSize))
       .map(x => (x, 1)).reduceByKey(_ + _).collect()
     val minimalFDs = candidates.filter(_._2 == partitionSize).map(_._1)
-
+    println("====Candidates: ")
+    candidates.foreach(println)
     res ++= minimalFDs
     fdsBV.unpersist()
     minimalFDs
