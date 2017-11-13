@@ -119,7 +119,7 @@ object FDsMine {
       if (value != null) {
         for (i <- true_rhs)
           if (!value(i).equals(right(i))) true_rhs -= i
-      } else dict += left -> right
+      } else dict.put(left, right)
     })
 
     true_rhs.map(r => (lhs, r)).toList
