@@ -30,7 +30,6 @@ object FDsMine {
     val emptyFD = mutable.Set.empty[Int]
     val results = mutable.ListBuffer.empty[(Set[Int], Int)]
 
-    var sum = 0
     for (i <- orders) {
       val partitionSize = i._2.toInt
       time2 = System.currentTimeMillis()
@@ -104,6 +103,19 @@ object FDsMine {
     val failed = mutable.ListBuffer.empty[(Set[Int],Int)]
     val minimalFDs = fdsBV.value.flatMap(fd => check(partition, fd._1, fd._2, colSize))
 
+    var sum = 0
+    fdsBV.value.foreach(x => sum += x._2.size)
+    println("All fds: " + sum)
+    fdsBV.value.foreach(println)
+
+    println("Check minimalFDs: " + minimalFDs.size)
+    var i = 0
+    minimalFDs.foreach(x => {
+      i += 1
+      println("No." + i + " " + x)
+    })
+    println()
+
     minimalFDs
   }
 
@@ -118,7 +130,7 @@ object FDsMine {
       val right = takeAttrRHS(d, rhs, colSize)
       val value = dict.getOrElse(left, null)
       if (value != null) {
-        for (i <- true_rhs)
+        for (i <- true_rhs.toList)
           if (!value(i).equals(right(i))) true_rhs -= i
       } else dict.put(left, right)
     })
