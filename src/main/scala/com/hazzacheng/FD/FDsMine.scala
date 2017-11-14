@@ -132,9 +132,9 @@ object FDsMine {
     val true_rhs = rhs.clone()
     val dict = mutable.HashMap.empty[String, Array[String]]
 
-    partition.foreach(d => {
-      val left = takeAttrLHS(d, lhs)
-      val right = takeAttrRHS(d, true_rhs, colSize)
+    partition.foreach(line => {
+      val left = takeAttrLHS(line, lhs)
+      val right = takeAttrRHS(line, true_rhs, colSize)
       val value = dict.getOrElse(left, null)
       if (value != null) {
         for (i <- true_rhs.toList)
