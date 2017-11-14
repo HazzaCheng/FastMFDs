@@ -32,32 +32,29 @@ object FDsMine {
 
     for (i <- orders) {
       val partitionSize = i._2.toInt
+      if (partitionSize == 1) emptyFD.add(i._1)
       time2 = System.currentTimeMillis()
       val candidates = FDUtils.getCandidateDependencies(dependencies, i._1)
       val lhsWithSize = candidates.toList.groupBy(_._1.size)
-      val keys = lhsWithSize.keys.toList.sortWith((x, y) => x < y)
+      //val keys = lhsWithSize.keys.toList.sortWith((x, y) => x < y)
 
       val partitionsRDD = repart(sc, rdd, i._1).persist(StorageLevel.MEMORY_AND_DISK_SER)
-//      var partitionsLocal: Array[List[Array[String]]] = Array()
-//      if (i._2 <= 20) partitionsLocal = partitionsRDD.collect().map(x => x._2)
-      for (k <- keys) {
-        val fds = lhsWithSize(k)
+      for (k <- 1 until colSize) {
+//        val fds = lhsWithSize.getOrElse(k, List())
+        val fds = candidates.toList.filter(_._1.size == k)
 
         println("====Size lhs in "  + i + " " + k + " " + fds.size)
-//        println("========Size- depend:"  + i + " " + k + " " + FDUtils.getDependenciesNums(fds))
         if (fds.nonEmpty) {
-          val successed = ListBuffer.empty[(Set[Int], Int)]
           time1 = System.currentTimeMillis()
-          val minimalFDs = checkPartitions(sc, partitionsRDD, fds, results, partitionSize, colSize)
+          val minimalFDs = checkPartitionsRDD(sc, partitionsRDD, fds, results, partitionSize, colSize)
           println("====Minimal FDs in " + i + " " + k)
           minimalFDs.foreach(println)
-          successed ++= minimalFDs
           println("====Paritions in " + i + " " + k + " Use Time=============" + (System.currentTimeMillis() - time1))
 
           time1 = System.currentTimeMillis()
-          println("====Size successed:"  + i + " " + k + " " + successed.size)
-          if (successed.nonEmpty) {
-            cutLeaves(candidates, successed.toList, i._1)
+          println("====Size successed:"  + i + " " + k + " " + minimalFDs.size)
+          if (minimalFDs.nonEmpty) {
+            cutLeaves(candidates, minimalFDs, i._1)
             println("====Cut Leaves in " + k + " Use Time=============" + (System.currentTimeMillis() - time1))
           }
         }
@@ -80,28 +77,37 @@ object FDsMine {
     partitions
   }
 
-  def checkPartitions(sc: SparkContext,
+  def checkPartitionsRDD(sc: SparkContext,
                       partitionsRDD: RDD[List[Array[String]]],
                       fds: List[(Set[Int], mutable.Set[Int])],
                       res: mutable.ListBuffer[(Set[Int], Int)],
                       partitionSize: Int,
                       colSize: Int): Array[(Set[Int], Int)] = {
     val fdsBV = sc.broadcast(fds)
-    val candidates = partitionsRDD.flatMap(p => checkFDs(fdsBV, p, colSize))
-      .map(x => (x, 1)).reduceByKey(_ + _).collect()
+    val candidates1 = partitionsRDD.flatMap(p => checkEachPartition(fdsBV, p, colSize))
+      //.map(x => (x, 1)).reduceByKey(_ + _).collect()
+    val candidates = candidates1.map(x => (x, 1)).reduceByKey(_ + _).collect()
     val minimalFDs = candidates.filter(_._2 == partitionSize).map(_._1)
+    val t1 = candidates1.distinct().count()
+    val candidates2 = candidates1.map(x => (x, 1)).groupByKey().collect().map(x => (x._1, x._2.size))
+    val t2 = candidates2.size
     println("====Candidates: ")
     candidates.foreach(println)
+
+    println("====Distinct: " + t1)
+
+    println("====GroupBy Candidates: " + t2)
+    candidates2.foreach(println)
+
     res ++= minimalFDs
     fdsBV.unpersist()
     minimalFDs
   }
 
-  def checkFDs(fdsBV: Broadcast[List[(Set[Int], mutable.Set[Int])]],
+  def checkEachPartition(fdsBV: Broadcast[List[(Set[Int], mutable.Set[Int])]],
                partition: List[Array[String]],
                colSize: Int): List[(Set[Int], Int)] = {
-    val failed = mutable.ListBuffer.empty[(Set[Int],Int)]
-    val minimalFDs = fdsBV.value.flatMap(fd => check(partition, fd._1, fd._2, colSize))
+    val minimalFDs = fdsBV.value.flatMap(fd => checkFD(partition, fd._1, fd._2, colSize))
 
     var sum = 0
     fdsBV.value.foreach(x => sum += x._2.size)
@@ -119,30 +125,38 @@ object FDsMine {
     minimalFDs
   }
 
-  def check(partition: List[Array[String]],
+  def checkFD(partition: List[Array[String]],
             lhs: Set[Int],
             rhs: mutable.Set[Int],
             colSize: Int): List[(Set[Int], Int)] = {
     val true_rhs = rhs.clone()
     val dict = mutable.HashMap.empty[String, Array[String]]
+
     partition.foreach(d => {
       val left = takeAttrLHS(d, lhs)
-      val right = takeAttrRHS(d, rhs, colSize)
+      val right = takeAttrRHS(d, true_rhs, colSize)
       val value = dict.getOrElse(left, null)
       if (value != null) {
         for (i <- true_rhs.toList)
-          if (!value(i).equals(right(i))) true_rhs -= i
+          if (!value(i).equals(right(i))) true_rhs.remove(i)
       } else dict.put(left, right)
+      if (true_rhs.isEmpty) return List()
     })
+
+    println("rhs: " + rhs.size)
+    rhs.foreach(println)
+    println("Check true_rhs: " + true_rhs.size)
+    true_rhs.foreach(println)
+    println()
 
     true_rhs.map(r => (lhs, r)).toList
   }
 
   def cutLeaves(candidates: mutable.HashMap[Set[Int], mutable.Set[Int]],
-                successed: List[(Set[Int], Int)], commonAttr: Int): Unit = {
+                successed: Array[(Set[Int], Int)], commonAttr: Int): Unit = {
     for (d <- successed) {
       val lend = d._1.size
-      val lhs = candidates.keys.filter(x => x.size > lend && (x & d._1) == d._1).toList
+      val lhs = candidates.keys.filter(x => (x.size > lend && (x & d._1) == d._1)).toList
       cut(candidates, lhs, d._2)
     }
   }
@@ -166,7 +180,7 @@ object FDsMine {
   def takeAttrLHS(arr: Array[String],
                   attributes: Set[Int]): String = {
     val s = mutable.StringBuilder.newBuilder
-    attributes.foreach(attr => s.append(arr(attr - 1) + " "))
+    attributes.toList.foreach(attr => s.append(arr(attr - 1) + " "))
 
     s.toString()
   }
@@ -175,7 +189,7 @@ object FDsMine {
                   attributes: mutable.Set[Int],
                   colSize: Int): Array[String] = {
     val res = new Array[String](colSize + 1)
-    attributes.foreach(attr => res(attr) = arr(attr - 1))
+    attributes.toList.foreach(attr => res(attr) = arr(attr - 1))
     res
   }
 
