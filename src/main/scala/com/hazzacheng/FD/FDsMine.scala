@@ -84,20 +84,17 @@ object FDsMine {
                       partitionSize: Int,
                       colSize: Int): Array[(Set[Int], Int)] = {
     val fdsBV = sc.broadcast(fds)
-    val candidates1 = partitionsRDD.flatMap(p => checkEachPartition(fdsBV, p, colSize))
-      //.map(x => (x, 1)).reduceByKey(_ + _).collect()
-    val candidates = candidates1.map(x => (x, 1)).reduceByKey(_ + _).collect()
+    val candidates = partitionsRDD.flatMap(p => checkEachPartition(fdsBV, p, colSize))
+      .map(x => (x, 1)).reduceByKey(_ + _).collect()
     val minimalFDs = candidates.filter(_._2 == partitionSize).map(_._1)
-    val t1 = candidates1.distinct().count()
-    val candidates2 = candidates1.map(x => (x, 1)).groupByKey().collect().map(x => (x._1, x._2.size))
-    val t2 = candidates2.size
+
+    //val test = sc
+
+    val a = candidates.size
+    val b = minimalFDs.size
+    println("====Candidates Size: " + a + " minimalFDs Size: " + b + " Partitions Size: " + partitionSize)
     println("====Candidates: ")
     candidates.foreach(println)
-
-    println("====Distinct: " + t1)
-
-    println("====GroupBy Candidates: " + t2)
-    candidates2.foreach(println)
 
     res ++= minimalFDs
     fdsBV.unpersist()
