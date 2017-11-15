@@ -28,6 +28,11 @@ object FDsMine {
     val emptyFD = mutable.HashSet.empty[Int]
     val results = mutable.HashSet.empty[(Set[Int], Int)]
 
+    val partitions = new Array[RDD[scala.List[Array[String]]]](colSize)
+    for (i <- orders)
+      partitions(i._1 - 1) = repart(sc, rdd, i._1).persist(StorageLevel.MEMORY_AND_DISK_SER)
+      // TODO: need to test different StorageLevel
+
     for (i <- orders) {
       val partitionSize = i._2.toInt
       if (partitionSize == 1) emptyFD.add(i._1)
@@ -36,7 +41,8 @@ object FDsMine {
       //val lhsWithSize = candidates.toList.groupBy(_._1.size)
       //val keys = lhsWithSize.keys.toList.sortWith((x, y) => x < y)
 
-      val partitionsRDD = repart(sc, rdd, i._1).persist(StorageLevel.MEMORY_AND_DISK_SER)
+//      val partitionsRDD = repart(sc, rdd, i._1).persist(StorageLevel.MEMORY_AND_DISK_SER)
+      val partitionsRDD = partitions(i._1 - 1)
       for (k <- 1 until colSize) {
 //        val fds = lhsWithSize.getOrElse(k, List())
         val fds = candidates.toList.filter(_._1.size == k)
@@ -93,7 +99,7 @@ object FDsMine {
     println("====Candidates Size: " + a + " minimalFDs Size: " + b + " Partitions Size: " + partitionSize)
     println("====Candidates: ")
     candidates.foreach(println)
-
+StorageLevel.MEMORY_AND_DISK_SER_2
     res ++= minimalFDs
     fdsBV.unpersist()
     minimalFDs
