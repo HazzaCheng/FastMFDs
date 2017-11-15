@@ -33,6 +33,7 @@ object FDsMine {
       partitions(i._1 - 1) = repart(sc, rdd, i._1).persist(StorageLevel.MEMORY_AND_DISK_SER)
       // TODO: need to test different StorageLevel
 
+
     for (i <- orders) {
       val partitionSize = i._2.toInt
       if (partitionSize == 1) emptyFD.add(i._1)
