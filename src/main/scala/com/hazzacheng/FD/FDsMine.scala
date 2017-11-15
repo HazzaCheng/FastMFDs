@@ -177,7 +177,7 @@ object FDsMine {
   def takeAttrLHS(arr: Array[String],
                   attributes: Set[Int]): String = {
     val s = mutable.StringBuilder.newBuilder
-    attributes.toList.foreach(attr => s.append(arr(attr - 1) + " "))
+    attributes.toList.foreach(attr => s.append(arr(attr - 1)))
 
     s.toString()
   }
