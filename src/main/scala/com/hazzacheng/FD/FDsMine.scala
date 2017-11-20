@@ -28,21 +28,23 @@ object FDsMine {
                   df: DataFrame,
                   colSize: Int,
                   filePath: String): Map[Set[Int], List[Int]] = {
-    val dependencies = FDsUtils.getDependencies(colSize)
     val results = mutable.HashSet.empty[(Set[Int], Int)]
 
     // get fds with single lhs
     val (singleFDs, singleLhsCount) = getSingleLhsFD(df, colSize)
     df.unpersist()
     // get equal attributes
-    val equalAttr = getEqualAttr(singleFDs)
+    val (equalAttr, withoutEqualAttr) = getEqualAttr(singleFDs)
     // get new orders
     val (equalAttrMap, ordersMap, orders, del) = createNewOrders(equalAttr, singleLhsCount, colSize)
-
     val newColSize = colSize - equalAttr.length
-
+    // create the new single lhs fds
+    val bottomFDs = getNewSingleFDs(withoutEqualAttr, ordersMap)
+    // check the fds with the longest lhs
     // create the RDD
     val rdd = FDsUtils.readAsRdd(sc, filePath, del)
+    // get all candidates FD without bottom level and top level
+    val candidates = removeTopAndBottom(getCandidates(newColSize), newColSize)
 
     // get all the partitions by common attributes
     val partitions = new Array[RDD[scala.List[Array[String]]]](newColSize)
@@ -135,16 +137,18 @@ object FDsMine {
     res
   }
 
-  def getEqualAttr(fds: Array[(Int, Int)]) = {
+  def getEqualAttr(fds: Array[(Int, Int)]): (List[(Int, Int)], Array[(Int, Int)]) = {
     val len = fds.length
-    val res = mutable.ListBuffer.empty[(Int, Int)]
+    val tmp = mutable.ListBuffer.empty[(Int, Int)]
 
     for (i <- 0 until (len - 1))
       for (j <- i + 1 until len)
         if (fds(i) == fds(j).swap)
-          res.append(fds(i))
+          tmp.append(fds(i))
+    val res = tmp.toList
+    val newFds = fds.filter(x => !res.contains(x) && !res.contains(x.swap))
 
-    res.toList
+    (res, newFds)
   }
 
   def createNewOrders(equalAttr: List[(Int, Int)],
@@ -179,6 +183,14 @@ object FDsMine {
       .sortWith((x, y) => x._2 > y._2)
 
     (equalAttrMap.toMap, ordersMap.toMap, orders, del.toList.sorted)
+  }
+
+  def getNewSingleFDs(singleFDs: Array[(Int, Int)],
+                      ordersMap: Map[Int, Int]): Array[(Int, Int)] = {
+    val reversedMap = ordersMap.map(x => (x._2, x._1))
+    val downLevel = singleFDs.map(x => (reversedMap(x._1), reversedMap(x._2)))
+
+    downLevel
   }
 
   def repart(sc: SparkContext,
@@ -236,11 +248,11 @@ object FDsMine {
   }
 
 
-  def getDependencies(num: Int): mutable.HashMap[Set[Int], mutable.Set[Int]]= {
+  def getCandidates(num: Int): mutable.HashMap[Set[Int], mutable.Set[Int]]= {
     val dependencies = mutable.HashMap.empty[Set[Int], mutable.Set[Int]]
     for (i <- 1 to num) {
       val nums = Range(1, num + 1).filter(_ != i).toArray
-      val subSets = FDsUtils.getSubsets(nums)
+      val subSets = getSubsets(nums)
       for (subSet <- subSets) {
         var value = dependencies.getOrElse(subSet, mutable.Set.empty[Int])
         value += i
@@ -267,8 +279,8 @@ object FDsMine {
     subSets.toList
   }
 
-  def getCandidateDependencies(dependencies: mutable.HashMap[Set[Int], mutable.Set[Int]],
-                               target: Int): mutable.HashMap[Set[Int], mutable.Set[Int]] = {
+  def getCommonCandidates(dependencies: mutable.HashMap[Set[Int], mutable.Set[Int]],
+                          target: Int): mutable.HashMap[Set[Int], mutable.Set[Int]] = {
     val candidates = mutable.HashMap.empty[Set[Int], mutable.Set[Int]]
     for (key <- dependencies.keys) {
       if (key contains target) {
@@ -280,6 +292,12 @@ object FDsMine {
     candidates
   }
 
+  def removeTopAndBottom(candidates: mutable.HashMap[Set[Int], mutable.Set[Int]],
+                       colSize: Int): mutable.HashMap[Set[Int], mutable.Set[Int]] = {
+    val newCandidates = candidates.filter(_._1 != colSize && colSize != 1)
+
+    newCandidates
+  }
 
   def cutLeaves(candidates: mutable.HashMap[Set[Int], mutable.Set[Int]],
                 results: mutable.HashSet[(Set[Int], Int)],
