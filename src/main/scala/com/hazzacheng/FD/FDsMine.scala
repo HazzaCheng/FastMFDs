@@ -27,11 +27,11 @@ object FDsMine {
   def findOnSpark(sc: SparkContext,
                   df: DataFrame,
                   colSize: Int,
-                  filePath: String): Map[Set[Int], List[Int]] = {
+                  filePath: String): Unit/*Map[Set[Int], List[Int]]*/ = {
     val results = mutable.HashSet.empty[(Set[Int], Int)]
 
     // get fds with single lhs
-    val (singleFDs, singleLhsCount) = getSingleLhsFD(df, colSize)
+    val (singleFDs, singleLhsCount) = getBottomFDs(df, colSize)
     df.unpersist()
     // get equal attributes
     val (equalAttr, withoutEqualAttr) = getEqualAttr(singleFDs)
@@ -39,12 +39,19 @@ object FDsMine {
     val (equalAttrMap, ordersMap, orders, del) = createNewOrders(equalAttr, singleLhsCount, colSize)
     val newColSize = colSize - equalAttr.length
     // create the new single lhs fds
-    val bottomFDs = getNewSingleFDs(withoutEqualAttr, ordersMap)
+    val bottomFDs = getNewBottomFDs(withoutEqualAttr, ordersMap)
     // check the fds with the longest lhs
-    // create the RDD
-    val rdd = FDsUtils.readAsRdd(sc, filePath, del)
+    val topCandidates = getLongestLhs(newColSize)
+    cutInTopLevel(topCandidates, bottomFDs)
+    val topFDs = getTopFDs(df, topCandidates)
     // get all candidates FD without bottom level and top level
     val candidates = removeTopAndBottom(getCandidates(newColSize), newColSize)
+    // cut from bottom level and top level
+    cutFromDownToTop(candidates, bottomFDs)
+    cutFromTopToDown(candidates, topFDs)
+
+    // create the RDD
+    val rdd = FDsUtils.readAsRdd(sc, filePath, del)
 
     // get all the partitions by common attributes
     val partitions = new Array[RDD[scala.List[Array[String]]]](newColSize)
@@ -52,7 +59,7 @@ object FDsMine {
       partitions(i._1 - 1) = repart(sc, rdd, i._1).persist(StorageLevel.MEMORY_AND_DISK_SER)
       // TODO: need to test different StorageLevel
 
-
+/*
     for (i <- orders) {
       val partitionSize = i._2.toInt
       time2 = System.currentTimeMillis()
@@ -94,10 +101,11 @@ object FDsMine {
       emptyFD.toList.foreach(rhs => results.add((Set.empty[Int], rhs)))
 
     results.toList.groupBy(_._1).map(x => (x._1, x._2.map(_._2)))
+    */
   }
 
-  private def getSingleLhsFD(df: DataFrame,
-                             colSize: Int): (Array[(Int, Int)], List[(Int, Int)]) = {
+  private def getBottomFDs(df: DataFrame,
+                           colSize: Int): (Array[(Int, Int)], List[(Int, Int)]) = {
     val lhs = getSingleLhsCount(df, colSize)
     val whole = getTwoAttributesCount(df, colSize)
 
@@ -185,15 +193,40 @@ object FDsMine {
     (equalAttrMap.toMap, ordersMap.toMap, orders, del.toList.sorted)
   }
 
-  def getNewSingleFDs(singleFDs: Array[(Int, Int)],
-                      ordersMap: Map[Int, Int]): Array[(Int, Int)] = {
+  def getNewBottomFDs(singleFDs: Array[(Int, Int)],
+                      ordersMap: Map[Int, Int]): Array[(Set[Int], Int)] = {
     val reversedMap = ordersMap.map(x => (x._2, x._1))
-    val downLevel = singleFDs.map(x => (reversedMap(x._1), reversedMap(x._2)))
+    val downLevel = singleFDs.map(x => (Set[Int](reversedMap(x._1)), reversedMap(x._2)))
 
     downLevel
   }
 
-  def repart(sc: SparkContext,
+  def getLongestLhs(colSize: Int): mutable.Set[(Set[Int], Int)] = {
+    val res = mutable.Set.empty[(Set[Int], Int)]
+    val range = Range(1, colSize + 1)
+
+    for (i <- 1 to colSize)
+      res.add(range.filter(_ != i).toSet, i)
+
+    res
+  }
+
+  private def getTopFDs(df: DataFrame,
+                        topCandidates: mutable.Set[(Set[Int], Int)]): mutable.Set[(Set[Int], Int)] = {
+    val cols = df.columns
+
+    val topFDs = topCandidates.filter{x =>
+      val lhs = x._1.map(y => cols(y - 1)).toArray
+      val whole = df.groupBy(cols(x._2 - 1), lhs: _*).count().count()
+      val left = df.groupBy(lhs.last, lhs.init: _*).count().count()
+
+      whole == left
+    }
+
+    topFDs
+  }
+
+  private def repart(sc: SparkContext,
              rdd: RDD[Array[String]],
              attribute: Int): RDD[List[Array[String]]] = {
     val partitions = rdd.map(line => (line(attribute - 1), List(line)))
@@ -202,7 +235,7 @@ object FDsMine {
     partitions
   }
 
-  def getMinimalsFDs(sc: SparkContext,
+  private def getMinimalsFDs(sc: SparkContext,
                      partitionsRDD: RDD[List[Array[String]]],
                      fds: List[(Set[Int], mutable.Set[Int])],
                      res: mutable.ListBuffer[(Set[Int], Int)],
@@ -218,7 +251,7 @@ object FDsMine {
     minimalFDs
   }
 
-  def checkEachPartition(fdsBV: Broadcast[List[(Set[Int], mutable.Set[Int])]],
+  private def checkEachPartition(fdsBV: Broadcast[List[(Set[Int], mutable.Set[Int])]],
                partition: List[Array[String]],
                colSize: Int): List[(Set[Int], Int)] = {
     val minimalFDs = fdsBV.value.flatMap(fd => checkFD(partition, fd._1, fd._2, colSize))
@@ -226,7 +259,7 @@ object FDsMine {
     minimalFDs
   }
 
-  def checkFD(partition: List[Array[String]],
+  private def checkFD(partition: List[Array[String]],
             lhs: Set[Int],
             rhs: mutable.Set[Int],
             colSize: Int): List[(Set[Int], Int)] = {
@@ -299,16 +332,29 @@ object FDsMine {
     newCandidates
   }
 
-  def cutLeaves(candidates: mutable.HashMap[Set[Int], mutable.Set[Int]],
-                results: mutable.HashSet[(Set[Int], Int)],
-                successed: Array[(Set[Int], Int)]): Unit = {
-    for (d <- successed) {
-      val lend = d._1.size
-      val lhs = candidates.keys.filter(x => x.size > lend && isSubSet(x, d._1)).toList
-      val nonMinimal = results.toList.filter(x =>
-        x._1.size > lend && isSubSet(x._1, d._1) && x._2 == d._2)
-      cutInCandidates(candidates, lhs, d._2)
-      nonMinimal.foreach(fd => results.remove(fd))
+  def cutInTopLevel(topLevel: mutable.Set[(Set[Int], Int)],
+                    minimal: Array[(Set[Int], Int)]): Unit = {
+    minimal.foreach{x =>
+      val del = topLevel.filter(y => isSubSet(y._1, x._1) && y._2 == x._2)
+      del.foreach(topLevel.remove(_))
+    }
+  }
+
+  def cutFromDownToTop(candidates: mutable.HashMap[Set[Int], mutable.Set[Int]],
+                       minimal: Array[(Set[Int], Int)]): Unit = {
+    for (fd <- minimal) {
+      val lend = fd._1.size
+      val lhs = candidates.keys.filter(x => x.size > lend && isSubSet(x, fd._1)).toList
+      cutInCandidates(candidates, lhs, fd._2)
+    }
+  }
+
+
+  def cutFromTopToDown(candidates: mutable.HashMap[Set[Int], mutable.Set[Int]],
+                       topFDs: mutable.Set[(Set[Int], Int)]) = {
+    for (fd <- topFDs.toList) {
+      val lhs = candidates.keys.filter(x => isSubSet(fd._1, x)).toList
+      cutInCandidates(candidates, lhs, fd._2)
     }
   }
 
@@ -327,13 +373,13 @@ object FDsMine {
     }
   }
 
-  def isSubSet(big: Set[Int], small: Set[Int]): Boolean = {
+  private def isSubSet(big: Set[Int], small: Set[Int]): Boolean = {
     small.toList.foreach(s => if (!big.contains(s)) return false)
 
     true
   }
 
-  def takeAttrLHS(arr: Array[String],
+  private def takeAttrLHS(arr: Array[String],
                   attributes: Set[Int]): String = {
     val s = mutable.StringBuilder.newBuilder
     attributes.toList.foreach(attr => s.append(arr(attr - 1)))
@@ -341,7 +387,7 @@ object FDsMine {
     s.toString()
   }
 
-  def takeAttrRHS(arr: Array[String],
+  private def takeAttrRHS(arr: Array[String],
                   attributes: mutable.Set[Int],
                   colSize: Int): Array[String] = {
     val res = new Array[String](colSize + 1)

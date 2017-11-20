@@ -18,15 +18,10 @@ object Main {
     val sc = ss.sparkContext
     val input = args(0)
     val output = args(1)
-    val (colSize, orders) = FDsUtils.getColSizeAndOreders(ss, input)
-    val rdd = FDsUtils.readAsRdd(sc, input)
-    val res = FDsMine.findOnSpark(sc, rdd, colSize, orders)
-    val fdMin = FDsUtils.outPutFormat2(res)
-    sc.parallelize(fdMin).saveAsTextFile(output)
+    val df = FDsUtils.getDataFrameFromCSV(ss, input)
+    val colSize = FDsUtils.getColSize(df)
+    val res = FDsMine.findOnSpark(sc, df, colSize, input)
 
-/*    val (rddWithIndex, colSize) = FDUtils.readAsRddWithIndex(sc, input)
-    val sets = FastFDs.genDiffSets(sc, rddWithIndex, colSize)
-    println("=========Size sets " + sets.size)*/
   }
 
 
