@@ -18,10 +18,10 @@ object Main {
     val sc = ss.sparkContext
     val input = args(0)
     val output = args(1)
-    val (colSize, orders) = FDUtils.getColSizeAndOreders(ss, input)
-    val rdd = FDUtils.readAsRdd(sc, input)
+    val (colSize, orders) = FDsUtils.getColSizeAndOreders(ss, input)
+    val rdd = FDsUtils.readAsRdd(sc, input)
     val res = FDsMine.findOnSpark(sc, rdd, colSize, orders)
-    val fdMin = FDUtils.outPutFormat2(res)
+    val fdMin = FDsUtils.outPutFormat2(res)
     sc.parallelize(fdMin).saveAsTextFile(output)
 
 /*    val (rddWithIndex, colSize) = FDUtils.readAsRddWithIndex(sc, input)

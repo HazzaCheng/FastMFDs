@@ -3,6 +3,7 @@ package com.hazzacheng.FD
 import org.apache.spark.SparkContext
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.storage.StorageLevel
 
 import scala.collection.mutable
@@ -23,20 +24,31 @@ object FDsMine {
   var time1 = System.currentTimeMillis()
   var time2 = System.currentTimeMillis()
 
-  def findOnSpark(sc: SparkContext, rdd: RDD[Array[String]],
-                  colSize: Int, orders: Array[(Int, Long)]): Map[Set[Int], List[Int]] = {
-    val dependencies = FDUtils.getDependencies(colSize)
+  def findOnSpark(sc: SparkContext,
+                  df: DataFrame,
+                  colSize: Int,
+                  filePath: String): Map[Set[Int], List[Int]] = {
+    val dependencies = FDsUtils.getDependencies(colSize)
     val results = mutable.HashSet.empty[(Set[Int], Int)]
 
+    // get fds with single lhs
+    val (singleFDs, singleLhsCount) = getSingleLhsFD(df, colSize)
+    df.unpersist()
+    // get equal attributes
+    val equalAttr = getEqualAttr(singleFDs)
+    // get new orders
+    val (equalAttrMap, ordersMap, orders, del) = createNewOrders(equalAttr, singleLhsCount, colSize)
+
+    val newColSize = colSize - equalAttr.length
+
+    // create the RDD
+    val rdd = FDsUtils.readAsRdd(sc, filePath, del)
+
     // get all the partitions by common attributes
-    val partitions = new Array[RDD[scala.List[Array[String]]]](colSize)
+    val partitions = new Array[RDD[scala.List[Array[String]]]](newColSize)
     for (i <- orders)
       partitions(i._1 - 1) = repart(sc, rdd, i._1).persist(StorageLevel.MEMORY_AND_DISK_SER)
       // TODO: need to test different StorageLevel
-
-    // check the shortest lhs and get the equal attributes
-    val singleLhsMinimalFds = checkSingleLHS(sc, partitions, orders, colSize)
-
 
 
     for (i <- orders) {
@@ -82,6 +94,93 @@ object FDsMine {
     results.toList.groupBy(_._1).map(x => (x._1, x._2.map(_._2)))
   }
 
+  private def getSingleLhsFD(df: DataFrame,
+                             colSize: Int): (Array[(Int, Int)], List[(Int, Int)]) = {
+    val lhs = getSingleLhsCount(df, colSize)
+    val whole = getTwoAttributesCount(df, colSize)
+
+    val map = whole.groupBy(_._2).map(x => (x._1, x._2.map(_._1)))
+    val res = mutable.ListBuffer.empty[(Int, (Int, Int))]
+
+    lhs.foreach{x =>
+      map.get(x._2) match {
+        case Some(sets) =>
+          sets.filter(t => t._1 == x._1 || t._2 == x._1).foreach(t => res.append((x._1, t)))
+        case None => None
+      }
+    }
+    val fds = res.toArray.map(x => if (x._1 == x._2._1) (x._1, x._2._2) else (x._1, x._2._1))
+
+    (fds, lhs)
+  }
+
+  private def getSingleLhsCount(df: DataFrame, colSize: Int): List[(Int, Int)] = {
+    val res = df.columns.map(col => df.groupBy(col).count().count())
+      .zipWithIndex.map(x => (x._2, x._1.toInt))
+
+    res.toList
+  }
+
+  private def getTwoAttributesCount(df: DataFrame, colSize: Int): List[((Int, Int), Int)] = {
+    val columns = df.columns
+    val tuples = mutable.ListBuffer.empty[((Int, Int), (String, String))]
+
+    for (i <- 0 until (colSize - 1))
+      for (j <- (i + 1) until colSize)
+        tuples.append(((i, j), (columns(i), columns(j))))
+
+    val res = tuples.toList.map(x =>
+      (x._1, df.groupBy(x._2._1, x._2._2).count().count().toInt))
+
+    res
+  }
+
+  def getEqualAttr(fds: Array[(Int, Int)]) = {
+    val len = fds.length
+    val res = mutable.ListBuffer.empty[(Int, Int)]
+
+    for (i <- 0 until (len - 1))
+      for (j <- i + 1 until len)
+        if (fds(i) == fds(j).swap)
+          res.append(fds(i))
+
+    res.toList
+  }
+
+  def createNewOrders(equalAttr: List[(Int, Int)],
+                      singleLhsCount: List[(Int, Int)],
+                      colSize: Int): (Map[Int, Int], Map[Int, Int], Array[(Int, Int)], List[Int]) = {
+    val maps = singleLhsCount.toMap
+    val equalAttrMap = mutable.Map.empty[Int, Int]
+    val ordersMap = mutable.Map.empty[Int, Int]
+    val tmp = mutable.Set.empty[Int]
+    val del = mutable.ListBuffer.empty[Int]
+    Range(1, colSize + 1).foreach(tmp.add(_))
+
+    equalAttr.foreach{x =>
+      if (maps(x._1) > maps(x._2)) {
+        equalAttrMap.put(x._1, x._2)
+        tmp.remove(x._2)
+        del.append(x._2 - 1)
+      } else {
+        equalAttrMap.put(x._2, x._1)
+        tmp.remove(x._1)
+        del.append(x._1 - 1)
+      }
+    }
+
+    var count = 1
+    for (i <- tmp.toList.sorted) {
+      ordersMap.put(count, i)
+      count += 1
+    }
+
+    val orders = ordersMap.toArray.map(x => (x._1, maps(x._2)))
+      .sortWith((x, y) => x._2 > y._2)
+
+    (equalAttrMap.toMap, ordersMap.toMap, orders, del.toList.sorted)
+  }
+
   def repart(sc: SparkContext,
              rdd: RDD[Array[String]],
              attribute: Int): RDD[List[Array[String]]] = {
@@ -89,30 +188,6 @@ object FDsMine {
       .reduceByKey(_ ++ _).map(_._2)
 
     partitions
-  }
-
-  private def checkSingleLHS(sc: SparkContext,
-                       partitions: Array[RDD[scala.List[Array[String]]]],
-                       orders: Array[(Int, Long)],
-                       colSize: Int): List[(Set[Int], Int)] = {
-    val res = mutable.ListBuffer.empty[(Set[Int], Int)]
-
-    for (commonAttr <- orders) {
-      val candidates = getSingleLhsFDs(commonAttr._1, colSize)
-      val partitionsSize = commonAttr._2.toInt
-      val partitionRDD = partitions(commonAttr._1 - 1)
-      getMinimalsFDs(sc, partitionRDD, List(candidates), res, partitionsSize, colSize)
-    }
-
-    res.toList
-  }
-
-  private def getSingleLhsFDs(lhs: Int,
-                             colSize: Int): (Set[Int], mutable.Set[Int]) = {
-    val fds = mutable.Set.empty[Int]
-    Range(1, colSize + 1).filter(_ != lhs).foreach(fds.add(_))
-
-    (Set[Int](lhs), fds)
   }
 
   def getMinimalsFDs(sc: SparkContext,
@@ -160,15 +235,12 @@ object FDsMine {
     true_rhs.map(r => (lhs, r)).toList
   }
 
-  def getEqualAttributes(fds: List[(Set[Int], Int)]): List[(Int, Int)] = {
-    val res = mutable.HashSet.empty[(Int, Int)]
-  }
 
   def getDependencies(num: Int): mutable.HashMap[Set[Int], mutable.Set[Int]]= {
     val dependencies = mutable.HashMap.empty[Set[Int], mutable.Set[Int]]
     for (i <- 1 to num) {
       val nums = Range(1, num + 1).filter(_ != i).toArray
-      val subSets = FDUtils.getSubsets(nums)
+      val subSets = FDsUtils.getSubsets(nums)
       for (subSet <- subSets) {
         var value = dependencies.getOrElse(subSet, mutable.Set.empty[Int])
         value += i

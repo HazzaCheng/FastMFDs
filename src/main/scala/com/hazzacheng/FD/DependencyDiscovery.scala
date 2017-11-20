@@ -24,7 +24,7 @@ object DependencyDiscovery {
 
   def findOnSpark(sc: SparkContext, rdd: RDD[Array[String]],
                   colSize: Int, orders: Array[(Int, Long)]): Map[Set[Int], mutable.Set[Int]] = {
-    val dependencies = FDUtils.getDependencies(colSize)
+    val dependencies = FDsUtils.getDependencies(colSize)
     val emptyFD = mutable.Set.empty[Int]
     val results = mutable.HashMap.empty[Set[Int], mutable.Set[Int]]
 
@@ -34,7 +34,7 @@ object DependencyDiscovery {
     var sum = 0
     for (i <- orders) {
       time2 = System.currentTimeMillis()
-      val candidates = FDUtils.getCandidateDependencies(dependencies, i._1)
+      val candidates = FDsUtils.getCandidateDependencies(dependencies, i._1)
       val lhsAll = candidates.keySet.toList.groupBy(_.size)
       val keys = lhsAll.keys.toList.sortWith((x, y) => x > y)
       val dict = mutable.HashMap.empty[String, mutable.HashMap[Set[Int], Int]]
@@ -44,9 +44,9 @@ object DependencyDiscovery {
       //if (i._2 <= 20) partitionsLocal = partitionsRDD.collect().map(x => x._2)
       for (k <- keys) {
         val ls = lhsAll(k)
-        val fds = FDUtils.getSameLhsFD(candidates, ls)
+        val fds = FDsUtils.getSameLhsFD(candidates, ls)
         println("========Size- lhs:"  + i + " " + k + " " + fds.size)
-        println("========Size- depend:"  + i + " " + k + " " + FDUtils.getDependenciesNums(fds))
+        println("========Size- depend:"  + i + " " + k + " " + FDsUtils.getDependenciesNums(fds))
         if (fds.nonEmpty) {
           sum += 1
           //val failed: ListBuffer[(Set[Int], Int)] = ListBuffer.empty
@@ -63,7 +63,7 @@ object DependencyDiscovery {
           val parallelDatas = partitionsRDD.flatMap(pair => parallelData(pair,fdsBV))
           val dictBV = sc.broadcast(dict)
           val info = parallelDatas.flatMap(pd => {
-            FDUtils.check(pd._1._2,pd._2._1,pd._2._2)
+            FDsUtils.check(pd._1._2,pd._2._1,pd._2._2)
           }).collect().toList
           val failed = info.distinct
           time1 = System.currentTimeMillis()
@@ -137,7 +137,7 @@ object DependencyDiscovery {
     val map = dictBV.value.getOrElse(partition._1, mutable.HashMap.empty[Set[Int], Int])
     val failed = mutable.ListBuffer.empty[(Set[Int],Int)]
     val res = fdsBV.value.toList.map(fd =>
-      FDUtils.checkEach(partition._2, fd._1, fd._2, map))
+      FDsUtils.checkEach(partition._2, fd._1, fd._2, map))
     res.foreach(r => {
       failed ++= r._1
       dict.put(r._2._1, r._2._2)
@@ -169,10 +169,10 @@ object DependencyDiscovery {
         }).collect().distinct.toList
         if (failFD.nonEmpty) {
           failed ++= failFD
-          println("========Size- before cut same lhs:"  + i + " " + k + " " + j + " " + FDUtils.getDependenciesNums(fds))
-          FDUtils.cutInSameLhs(fds, failFD)
+          println("========Size- before cut same lhs:"  + i + " " + k + " " + j + " " + FDsUtils.getDependenciesNums(fds))
+          FDsUtils.cutInSameLhs(fds, failFD)
           println("========Size- failed In Partition:"  + i + " " + k + " " + j + " " + failed.size)
-          println("========Size- after cut same lhs:"  + i + " " + k + " " + j + " " + FDUtils.getDependenciesNums(fds))
+          println("========Size- after cut same lhs:"  + i + " " + k + " " + j + " " + FDsUtils.getDependenciesNums(fds))
         }
         partitionBV.unpersist()
         j += 1
@@ -182,7 +182,7 @@ object DependencyDiscovery {
 
   def checkFDs(partitionBV: Broadcast[List[Array[String]]],
                fd: (Set[Int], mutable.Set[Int])): List[(Set[Int], Int)] = {
-    val res = FDUtils.check(partitionBV.value, fd._1, fd._2)
+    val res = FDsUtils.check(partitionBV.value, fd._1, fd._2)
     res
   }
 
@@ -205,10 +205,10 @@ object DependencyDiscovery {
                 failed: List[(Set[Int], Int)], commonAttr: Int) :Int = {
     var sum = 0
     for (d <- failed) {
-      val subSets = FDUtils.getSubsets(d._1.toArray)
+      val subSets = FDsUtils.getSubsets(d._1.toArray)
       for (subSet <- subSets) {
-        if (subSet contains commonAttr) sum += FDUtils.cut(candidates, subSet, d._2)
-        else sum += FDUtils.cut(dependencies, subSet, d._2)
+        if (subSet contains commonAttr) sum += FDsUtils.cut(candidates, subSet, d._2)
+        else sum += FDsUtils.cut(dependencies, subSet, d._2)
       }
     }
     sum
@@ -234,7 +234,7 @@ object DependencyDiscovery {
     for(i <- index.value){
       if(i >= f._1) return f._2
       for(fd <- dataBV.value(i))
-        if(FDUtils.isSubset(fd._1, f._2._1)) f._2._2 --= fd._2
+        if(FDsUtils.isSubset(fd._1, f._2._1)) f._2._2 --= fd._2
     }
     f._2
   }
