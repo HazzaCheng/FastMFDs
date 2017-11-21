@@ -68,7 +68,10 @@ object FDsMine {
 
         if (toChecked.nonEmpty) {
           val minimalFDs = getMinimalsFDs(sc, partitionRDD, toChecked, results, partitionSize, newColSize)
-          if (minimalFDs.nonEmpty) cutFromDownToTop(candidates, minimalFDs)
+          if (minimalFDs.nonEmpty) {
+            cutFromDownToTop(candidates, minimalFDs)
+            if (topFDs.nonEmpty) cutInTopLevel(topFDs, minimalFDs)
+          }
         }
       }
     }
@@ -78,6 +81,9 @@ object FDsMine {
     emptyFD ++= orders.filter(_._2.toInt == 1).map(_._1)
     if (emptyFD.nonEmpty)
       emptyFD.toList.foreach(rhs => results.append((Set.empty[Int], rhs)))
+
+    // check the top level
+    if (topFDs.nonEmpty) results ++= topFDs
 
     // recover all fds
     val fds = recoverAllFDs(results.toList, equalAttrMap, ordersMap)
