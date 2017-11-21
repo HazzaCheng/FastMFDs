@@ -27,8 +27,8 @@ object FDsMine {
   def findOnSpark(sc: SparkContext,
                   df: DataFrame,
                   colSize: Int,
-                  filePath: String): Unit/*Map[Set[Int], List[Int]]*/ = {
-    val results = mutable.HashSet.empty[(Set[Int], Int)]
+                  filePath: String): Map[Set[Int], List[Int]] = {
+    val results = mutable.ListBuffer.empty[(Set[Int], Int)]
 
     // get fds with single lhs
     val (singleFDs, singleLhsCount) = getBottomFDs(df, colSize)
@@ -59,49 +59,30 @@ object FDsMine {
       partitions(i._1 - 1) = repart(sc, rdd, i._1).persist(StorageLevel.MEMORY_AND_DISK_SER)
       // TODO: need to test different StorageLevel
 
-/*
-    for (i <- orders) {
-      val partitionSize = i._2.toInt
-      time2 = System.currentTimeMillis()
-      val candidates = getCandidateDependencies(dependencies, i._1)
-      //val lhsWithSize = candidates.toList.groupBy(_._1.size)
-      //val keys = lhsWithSize.keys.toList.sortWith((x, y) => x < y)
 
-//      val partitionsRDD = repart(sc, rdd, i._1).persist(StorageLevel.MEMORY_AND_DISK_SER)
-      val partitionsRDD = partitions(i._1 - 1)
-      for (k <- 1 until colSize) {
-//        val fds = lhsWithSize.getOrElse(k, List())
-        val fds = candidates.toList.filter(_._1.size == k)
+    for (level <- 2 until (newColSize - 1)) {
+      for (common <- orders) {
+        val partitionSize = common._2
+        val partitionRDD = partitions(common._1 - 1)
+        val toChecked = getTargetCandidates(candidates, common._1, level).toList
 
-        println("====Size lhs in "  + i + " " + k + " " + fds.size)
-        if (fds.nonEmpty) {
-          time1 = System.currentTimeMillis()
-          val minimalFDs = checkPartitionsRDD(sc, partitionsRDD, fds, results, partitionSize, colSize)
-          println("====Minimal FDs in " + i + " " + k)
-          minimalFDs.foreach(println)
-          println("====Paritions in " + i + " " + k + " Use Time=============" + (System.currentTimeMillis() - time1))
-
-          time1 = System.currentTimeMillis()
-          println("====Size successed:"  + i + " " + k + " " + minimalFDs.size)
-          if (minimalFDs.nonEmpty) {
-            cutLeaves(candidates, results, minimalFDs)
-            println("====Cut Leaves in " + k + " Use Time=============" + (System.currentTimeMillis() - time1))
-          }
+        if (toChecked.nonEmpty) {
+          val minimalFDs = getMinimalsFDs(sc, partitionRDD, toChecked, results, partitionSize, newColSize)
+          if (minimalFDs.nonEmpty) cutFromDownToTop(candidates, minimalFDs)
         }
       }
-
-      println("====Common Attr in " + i + " Use Time=============" + (System.currentTimeMillis() - time2))
     }
-
 
     // check empty lhs
     val emptyFD = mutable.ListBuffer.empty[Int]
     emptyFD ++= orders.filter(_._2.toInt == 1).map(_._1)
     if (emptyFD.nonEmpty)
-      emptyFD.toList.foreach(rhs => results.add((Set.empty[Int], rhs)))
+      emptyFD.toList.foreach(rhs => results.append((Set.empty[Int], rhs)))
 
-    results.toList.groupBy(_._1).map(x => (x._1, x._2.map(_._2)))
-    */
+    // recover all fds
+    val fds = recoverAllFDs(results.toList, equalAttrMap, ordersMap)
+
+    fds
   }
 
   private def getBottomFDs(df: DataFrame,
@@ -236,11 +217,11 @@ object FDsMine {
   }
 
   private def getMinimalsFDs(sc: SparkContext,
-                     partitionsRDD: RDD[List[Array[String]]],
-                     fds: List[(Set[Int], mutable.Set[Int])],
-                     res: mutable.ListBuffer[(Set[Int], Int)],
-                     partitionSize: Int,
-                     colSize: Int): Array[(Set[Int], Int)] = {
+                             partitionsRDD: RDD[List[Array[String]]],
+                             fds: List[(Set[Int], mutable.Set[Int])],
+                             res: mutable.ListBuffer[(Set[Int], Int)],
+                             partitionSize: Int,
+                             colSize: Int): Array[(Set[Int], Int)] = {
     val fdsBV = sc.broadcast(fds)
     val candidates = partitionsRDD.flatMap(p => checkEachPartition(fdsBV, p, colSize))
       .map(x => (x, 1)).reduceByKey(_ + _).collect()
@@ -312,17 +293,19 @@ object FDsMine {
     subSets.toList
   }
 
-  def getCommonCandidates(dependencies: mutable.HashMap[Set[Int], mutable.Set[Int]],
-                          target: Int): mutable.HashMap[Set[Int], mutable.Set[Int]] = {
-    val candidates = mutable.HashMap.empty[Set[Int], mutable.Set[Int]]
-    for (key <- dependencies.keys) {
-      if (key contains target) {
-        candidates += (key -> dependencies.get(key).get)
-        dependencies -= key
+  def getTargetCandidates(candidates: mutable.HashMap[Set[Int], mutable.Set[Int]],
+                          common: Int,
+                          level: Int): mutable.HashMap[Set[Int], mutable.Set[Int]] = {
+    val res = mutable.HashMap.empty[Set[Int], mutable.Set[Int]]
+
+    for (key <- candidates.keys) {
+      if (key.size == level && key.contains(common)) {
+        res.put(key, candidates(key))
+        candidates.remove(key)
       }
     }
 
-    candidates
+    res
   }
 
   def removeTopAndBottom(candidates: mutable.HashMap[Set[Int], mutable.Set[Int]],
@@ -393,6 +376,38 @@ object FDsMine {
     val res = new Array[String](colSize + 1)
     attributes.toList.foreach(attr => res(attr) = arr(attr - 1))
     res
+  }
+
+  def recoverAllFDs(results: List[(Set[Int], Int)],
+                    equalAttrMap: Map[Int, Int],
+                    ordersMap: Map[Int, Int]): Map[Set[Int], List[Int]]  = {
+    val fds = mutable.ListBuffer.empty[(Set[Int], Int)]
+
+    val tmp = results.map{x =>
+      val lhs = x._1.map(ordersMap(_))
+      val rhs = ordersMap(x._2)
+      (lhs, rhs)
+    }
+
+    val equalAttrs = equalAttrMap.keySet
+    for (fd <- tmp) {
+      val list = mutable.ListBuffer.empty[mutable.ListBuffer[Int]]
+      fd._1.foreach {i =>
+        if (equalAttrs contains i) {
+          val copy = list.clone()
+          list.foreach(_.append(i))
+          copy.foreach(_.append(equalAttrMap(i)))
+          list ++= copy
+        } else list.foreach(_.append(i))
+      }
+      fds ++= list.map(x => (x.toSet, fd._2))
+    }
+
+    for (fd <- fds.toList)
+      if (equalAttrs contains fd._2)
+        fds.append((fd._1, equalAttrMap(fd._2)))
+
+    fds.toList.groupBy(_._1).map(x => (x._1, x._2.map(_._2)))
   }
 
 }

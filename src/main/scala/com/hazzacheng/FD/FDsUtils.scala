@@ -69,12 +69,14 @@ object FDsUtils {
   }
 
 
+/*
   def outPutFormat(minFD: Map[Set[Int], mutable.Set[Int]]): List[String] = {
     minFD.map(d => d._1.toList.sorted.map(x => "column" + x).mkString("[", ",", "]")
     + ":" + d._2.toList.sorted.map(x => "column" + x).mkString(",")).toList
   }
+*/
 
-  def outPutFormat2(minFD: Map[Set[Int], List[Int]]): List[String] = {
+  def outPutFormat(minFD: Map[Set[Int], List[Int]]): List[String] = {
     minFD.map(d => d._1.toList.sorted.map(x => "column" + x).mkString("[", ",", "]")
       + ":" + d._2.sorted.map(x => "column" + x).mkString(",")).toList
   }

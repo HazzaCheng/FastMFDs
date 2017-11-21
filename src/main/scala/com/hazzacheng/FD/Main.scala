@@ -20,8 +20,10 @@ object Main {
     val output = args(1)
     val df = FDsUtils.getDataFrameFromCSV(ss, input)
     val colSize = FDsUtils.getColSize(df)
-    val res = FDsMine.findOnSpark(sc, df, colSize, input)
+    val fds = FDsMine.findOnSpark(sc, df, colSize, input)
+    val res = FDsUtils.outPutFormat(fds)
 
+    sc.parallelize(res).saveAsTextFile(output)
   }
 
 
