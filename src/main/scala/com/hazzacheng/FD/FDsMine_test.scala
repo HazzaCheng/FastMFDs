@@ -54,28 +54,39 @@ object FDsMine_test {
     val rdd = FDsUtils.readAsRdd(sc, filePath, del)
 
     // create the map which save cutted leaves
+    val wholeMap = mutable.HashMap
+      .empty[Int, mutable.HashMap[String, mutable.HashSet[(Set[Int], Int)]]]
 
 
     // get all the partitions by common attributes
-    val partitions = new Array[RDD[scala.List[Array[String]]]](newColSize)
-    for (i <- orders)
-      partitions(i._1 - 1) = repart(sc, rdd, i._1).persist(StorageLevel.MEMORY_AND_DISK_SER)
+    val partitions = new Array[RDD[(String, List[Array[String]])]](newColSize)
+    for (common <- orders) {
+      wholeMap.put(common._1, mutable.HashMap.empty[String, mutable.HashSet[(Set[Int], Int)]])
+      partitions(common._1 - 1) = repart(sc, rdd, common._1).persist(StorageLevel.MEMORY_AND_DISK_SER)
       // TODO: need to test different StorageLevel
-
+    }
 
     for (level <- 2 until (newColSize - 1)) {
       for (common <- orders) {
         val partitionSize = common._2
         val partitionRDD = partitions(common._1 - 1)
         val toChecked = getTargetCandidates(candidates, common._1, level).toList
+        val levelMap = wholeMap(common._1)
 
         if (toChecked.nonEmpty) {
-          val minimalFDs = getMinimalsFDs(sc, partitionRDD, toChecked, results, partitionSize, newColSize)
+          val (minimalFDs, failFDs, partWithFailFDs) =
+            getMinimalsFDs(sc, partitionRDD, toChecked, results, partitionSize, newColSize, levelMap)
           if (minimalFDs.nonEmpty) {
             cutFromDownToTop(candidates, minimalFDs)
             if (topFDs.nonEmpty) cutInTopLevel(topFDs, minimalFDs)
           }
+          if (failFDs.nonEmpty) {
+            val cuttedFDsMap = getCuttedFDsMap(candidates, failFDs)
+            updateLevelMap(cuttedFDsMap, partWithFailFDs, levelMap, level)
+          }
         }
+
+        wholeMap.update(common._1, levelMap)
       }
     }
 
@@ -218,43 +229,65 @@ object FDsMine_test {
 
   private def repart(sc: SparkContext,
              rdd: RDD[Array[String]],
-             attribute: Int): RDD[List[Array[String]]] = {
+             attribute: Int): RDD[(String, List[Array[String]])] = {
     val partitions = rdd.map(line => (line(attribute - 1), List(line)))
-      .reduceByKey(_ ++ _).map(_._2)
+      .reduceByKey(_ ++ _)
 
     partitions
   }
 
   private def getMinimalsFDs(sc: SparkContext,
-                             partitionsRDD: RDD[List[Array[String]]],
+                             partitionsRDD: RDD[(String, List[Array[String]])],
                              fds: List[(Set[Int], mutable.Set[Int])],
                              res: mutable.ListBuffer[(Set[Int], Int)],
                              partitionSize: Int,
-                             colSize: Int): Array[(Set[Int], Int)] = {
+                             colSize: Int,
+                             levelMap: mutable.HashMap[String, mutable.HashSet[(Set[Int], Int)]]
+                            ): (Array[(Set[Int], Int)], Set[(Set[Int], Int)], Array[(String, List[(Set[Int], Int)])]) = {
     val fdsBV = sc.broadcast(fds)
-    val candidates = partitionsRDD.flatMap(p => checkEachPartition(fdsBV, p, colSize))
-      .map(x => (x, 1)).reduceByKey(_ + _).collect()
+    val levelMapBV = sc.broadcast(levelMap)
+    val tuplesRDD = partitionsRDD.map(p => checkEachPartition(fdsBV, levelMapBV, p, colSize)).persist(StorageLevel.MEMORY_AND_DISK_SER)
+    val duplicatesRDD = tuplesRDD.flatMap(x => x._2).persist(StorageLevel.MEMORY_AND_DISK_SER)
+    val candidates = duplicatesRDD.map(x => (x, 1)).reduceByKey(_ + _).collect()
+    // TODO: local vs parallel
     val minimalFDs = candidates.filter(_._2 == partitionSize).map(_._1)
-
     res ++= minimalFDs
+
+    val failFDs = duplicatesRDD.collect().distinct.toSet -- minimalFDs
+    val partWithFailFDs = tuplesRDD.collect()
+
+    tuplesRDD.unpersist()
+    duplicatesRDD.unpersist()
     fdsBV.unpersist()
-    minimalFDs
+
+    (minimalFDs, failFDs, partWithFailFDs)
   }
 
   private def checkEachPartition(fdsBV: Broadcast[List[(Set[Int], mutable.Set[Int])]],
-               partition: List[Array[String]],
-               colSize: Int): List[(Set[Int], Int)] = {
-    val minimalFDs = fdsBV.value.flatMap(fd => checkFD(partition, fd._1, fd._2, colSize))
+                                 levelMapBV: Broadcast[mutable.HashMap[String, mutable.HashSet[(Set[Int], Int)]]],
+                                 partition: (String, List[Array[String]]),
+                                 colSize: Int): (String, List[(Set[Int], Int)]) = {
+    val levelMap = levelMapBV.value.getOrElse(partition._1, mutable.HashSet.empty[(Set[Int], Int)])
+    val minimalFDs = fdsBV.value.flatMap(fd => checkFD(partition._2, levelMap, fd._1, fd._2, colSize))
 
-    minimalFDs
+    (String, minimalFDs)
   }
 
   private def checkFD(partition: List[Array[String]],
-            lhs: Set[Int],
-            rhs: mutable.Set[Int],
-            colSize: Int): List[(Set[Int], Int)] = {
+                      levelMap: mutable.HashSet[(Set[Int], Int)],
+                      lhs: Set[Int],
+                      rhs: mutable.Set[Int],
+                      colSize: Int): List[(Set[Int], Int)] = {
     val true_rhs = rhs.clone()
+    val tmp = mutable.Set.empty[Int]
     val dict = mutable.HashMap.empty[String, Array[String]]
+
+    rhs.foreach{r =>
+      if (levelMap contains (lhs, r)) {
+        tmp.add(r)
+        true_rhs.remove(r)
+      }
+    }
 
     partition.foreach(line => {
       val left = takeAttrLHS(line, lhs)
@@ -266,6 +299,8 @@ object FDsMine_test {
       } else dict.put(left, right)
       if (true_rhs.isEmpty) return List()
     })
+
+    true_rhs ++= tmp
 
     true_rhs.map(r => (lhs, r)).toList
   }
@@ -343,7 +378,7 @@ object FDsMine_test {
 
 
   def cutFromTopToDown(candidates: mutable.HashMap[Set[Int], mutable.Set[Int]],
-                       topFDs: mutable.Set[(Set[Int], Int)]) = {
+                       topFDs: mutable.Set[(Set[Int], Int)]): Unit = {
     for (fd <- topFDs.toList) {
       val lhs = candidates.keys.filter(x => isSubSet(fd._1, x)).toList
       cutInCandidates(candidates, lhs, fd._2)
@@ -363,6 +398,36 @@ object FDsMine_test {
         }
       }
     }
+  }
+
+  def getCutted(candidates: mutable.HashMap[Set[Int], mutable.Set[Int]],
+                fd: (Set[Int], Int)): mutable.HashSet[(Set[Int], Int)] = {
+    val res = mutable.HashSet.empty[(Set[Int], Int)]
+
+    val lhs = candidates.keys.filter(x => isSubSet(fd._1, x)).toList
+    res ++= getCuttedInCandidates(candidates, lhs, fd._2)
+
+    res
+  }
+
+  def getCuttedInCandidates(candidates: mutable.HashMap[Set[Int], mutable.Set[Int]],
+                            lhs: List[Set[Int]],
+                            rhs: Int): List[(Set[Int], Int)]= {
+    val cutted = mutable.ListBuffer.empty[(Set[Int], Int)]
+
+    for (l <- lhs) {
+      val value = candidates(l)
+      if (value contains rhs) {
+        cutted.append((l, rhs))
+        if (value.size == 1) candidates.remove(l)
+        else {
+          value.remove(rhs)
+          candidates.update(l, value)
+        }
+      }
+    }
+
+    cutted.toList
   }
 
   private def isSubSet(big: Set[Int], small: Set[Int]): Boolean = {
@@ -418,5 +483,38 @@ object FDsMine_test {
 
     fds.toList.groupBy(_._1).map(x => (x._1, x._2.map(_._2)))
   }
+
+  def updateLevelMap(cuttedFDsMap: mutable.HashMap[(Set[Int], Int), mutable.HashSet[(Set[Int], Int)]],
+                     partWithFailFDs: Array[(String, List[(Set[Int], Int)])],
+                     levelMap: mutable.HashMap[String, mutable.HashSet[(Set[Int], Int)]],
+                     level: Int): Unit = {
+    partWithFailFDs.foreach{x =>
+      val cutted = levelMap.getOrElse(x._1, mutable.HashSet.empty[(Set[Int], Int)])
+        .filter(_._1.size > level)
+
+      x._2.foreach{y =>
+        val value = cuttedFDsMap.getOrElse(y, mutable.HashSet.empty[(Set[Int], Int)])
+        if (value.nonEmpty) cutted ++= value
+      }
+
+      if (cutted.nonEmpty) levelMap.update(x._1, cutted)
+    }
+  }
+
+  def getCuttedFDsMap(candidates: mutable.HashMap[Set[Int], mutable.Set[Int]],
+                   failFDs: Set[(Set[Int], Int)]
+                     ): mutable.HashMap[(Set[Int], Int), mutable.HashSet[(Set[Int], Int)]] = {
+    val map = mutable.HashMap.empty[(Set[Int], Int), mutable.HashSet[(Set[Int], Int)]]
+    // TODO: set vs hashset
+    failFDs.foreach{x =>
+      val cutted = getCutted(candidates, x)
+      if (cutted.nonEmpty) {
+        map.put(x, cutted)
+      }
+    }
+
+    map
+  }
+
 
 }
