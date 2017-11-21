@@ -47,8 +47,9 @@ class FDsMineTest extends FunSuite {
   test("get bottom FDs"){
     val withoutEqualAttr = Array((1, 3), (2, 3))
     val ordersMap = Map(1 -> 1, 2 -> 4)
-    val bottomFDs = getNewBottomFDs(withoutEqualAttr, ordersMap)
-    assert(bottomFDs.toList == List((Set(1), 3)))
+    val equalAttr = List((1,2),(3,4))
+    val bottomFDs = getNewBottomFDs(withoutEqualAttr, ordersMap, equalAttr)
+    assert(bottomFDs.toList == List((Set(1), 2)))
   }
 
   test("get longest Lhs"){
@@ -86,5 +87,27 @@ class FDsMineTest extends FunSuite {
     val topFDs = mutable.Set((Set(1,2),3))
     cutFromTopToDown(candidates, topFDs)
     assert(candidates.toList == List((Set(1, 3),Set(2)), (Set(2),Set(1)), (Set(3),Set(1, 2)), (Set(2, 3),Set(1)), (Set(1),Set(2))))
+  }
+
+  test("get target candidates"){
+    var candidates = mutable.HashMap.empty[Set[Int], mutable.Set[Int]]
+    candidates += Set(1,2) -> mutable.Set(3,4)
+    candidates += Set(1,3) -> mutable.Set(2,4)
+    candidates += Set(1,4) -> mutable.Set(2,3)
+    candidates += Set(1) -> mutable.Set(2,3,4)
+    candidates += Set(2) -> mutable.Set(1,3,4)
+    candidates += Set(1,2,3) -> mutable.Set(4)
+    val common = 1
+    val level = 2
+    val toChecked = getTargetCandidates(candidates, common, level).toList
+    assert(toChecked == List((Set(1, 3),Set(2, 4)), (Set(1, 2),Set(3, 4)), (Set(1, 4),Set(2, 3))))
+  }
+
+  test("recover all fds"){
+    val results = List((Set(1,2,3),4))
+    val equalAttrMap = Map((1,2),(3,4))
+    val ordersMap = Map((1,1),(2,3),(3,5),(4,6))
+    val fds = recoverAllFDs(results, equalAttrMap, ordersMap)
+    println(fds)
   }
 }

@@ -39,7 +39,7 @@ object FDsMine {
     val (equalAttrMap, ordersMap, orders, del) = createNewOrders(equalAttr, singleLhsCount, colSize)
     val newColSize = colSize - equalAttr.length
     // create the new single lhs fds
-    val bottomFDs = getNewBottomFDs(withoutEqualAttr, ordersMap)
+    val bottomFDs = getNewBottomFDs(withoutEqualAttr, ordersMap, equalAttr)
     // check the fds with the longest lhs
     val topCandidates = getLongestLhs(newColSize)
     cutInTopLevel(topCandidates, bottomFDs)
@@ -181,11 +181,15 @@ object FDsMine {
   }
 
   def getNewBottomFDs(singleFDs: Array[(Int, Int)],
-                      ordersMap: Map[Int, Int]): Array[(Set[Int], Int)] = {
-    val reversedMap = ordersMap.map(x => (x._2, x._1))
-    val downLevel = singleFDs.map(x => (Set[Int](reversedMap(x._1)), reversedMap(x._2)))
+                      ordersMap: Map[Int, Int],
+                     equalAttr: List[(Int,Int)]): Array[(Set[Int], Int)] = {
+    val addMap = equalAttr.flatMap(x => Array((x._1, x._2), (x._2, x._1))).toMap
+    //val reversedMap = ordersMap.map(x => (x._2, x._1))
+    var rMap = ordersMap.map(x => (x._2, x._1))
+    ordersMap.foreach(x => rMap += addMap(x._2) -> x._1)
+    val downLevel = singleFDs.map(x => (Set[Int](rMap(x._1)), rMap(x._2)))
 
-    downLevel
+    downLevel.distinct
   }
 
   def getLongestLhs(colSize: Int): mutable.Set[(Set[Int], Int)] = {
@@ -394,22 +398,32 @@ object FDsMine {
       val rhs = ordersMap(x._2)
       (lhs, rhs)
     }
-
+    println("tmp: " + tmp.toString())
     val equalAttrs = equalAttrMap.keySet
     for (fd <- tmp) {
       val list = mutable.ListBuffer.empty[mutable.ListBuffer[Int]]
       list.append(mutable.ListBuffer.empty[Int])
       fd._1.foreach {i =>
+        println("i:" + i)
         if (equalAttrs contains i) {
-          val copy = list.clone()
-          list.foreach(_.append(i))
-          copy.foreach(_.append(equalAttrMap(i)))
+          val copy = mutable.ListBuffer.empty[mutable.ListBuffer[Int]]
+          list.foreach(x => {
+            copy += x
+            x :+ i
+          })
+          println("list append i: " + list.toList.toString())
+          copy.foreach(_ :+ equalAttrMap(i))
+          println("copy append equal(i): " + copy.toList.toString())
           list ++= copy
-        } else list.foreach(_.append(i))
+          println("list: " + list.toList.toString())
+        } else {
+          list.foreach(_ :+ i)
+          println("list: " + list.toList.toString())
+        }
       }
       fds ++= list.map(x => (x.toSet, fd._2))
     }
-
+    println(fds.toList)
     for (fd <- fds.toList)
       if (equalAttrs contains fd._2)
         fds.append((fd._1, equalAttrMap(fd._2)))

@@ -87,16 +87,16 @@ class FDUtilsTest extends FunSuite {
 //
 //  }
 
-  test("output") {
-    val fdMin = mutable.HashMap.empty[Set[Int], mutable.Set[Int]]
-    fdMin += (Set.empty[Int] -> mutable.Set[Int](1, 2, 3))
-    fdMin += (Set(1, 2) -> mutable.Set[Int](4, 5))
-
-    val str = FDsUtils.outPutFormat(fdMin.toMap)
-//    str.foreach(println)
-    assert(str.apply(0) === "[column1,column2]:column4,column5")
-    assert(str.apply(1) === "[]:column1,column2,column3")
-  }
+//  test("output") {
+//    val fdMin = mutable.HashMap.empty[Set[Int], mutable.Set[Int]]
+//    fdMin += (Set.empty[Int] -> mutable.Set[Int](1, 2, 3))
+//    fdMin += (Set(1, 2) -> mutable.Set[Int](4, 5))
+//
+//    val str = FDsUtils.outPutFormat(fdMin.toMap)
+////    str.foreach(println)
+//    assert(str.apply(0) === "[column1,column2]:column4,column5")
+//    assert(str.apply(1) === "[]:column1,column2,column3")
+//  }
   test("HashMap") {
     val data = mutable.HashMap.empty[Set[Int], (mutable.Set[Int], mutable.HashMap[String,Array[String]])]
     data.put(Set(1,2),mutable.Set(4,3) -> mutable.HashMap.empty[String,Array[String]])
