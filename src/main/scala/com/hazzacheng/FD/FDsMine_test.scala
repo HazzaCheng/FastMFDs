@@ -3,7 +3,7 @@ package com.hazzacheng.FD
 import org.apache.spark.SparkContext
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.DataFrame
 import org.apache.spark.storage.StorageLevel
 
 import scala.collection.mutable
@@ -19,7 +19,7 @@ import scala.collection.mutable.ListBuffer
   * Time: 9:01 AM
   */
 
-object FDsMine {
+object FDsMine_test {
   private val parallelScaleFactor = 4
   var time1 = System.currentTimeMillis()
   var time2 = System.currentTimeMillis()
@@ -52,6 +52,9 @@ object FDsMine {
 
     // create the RDD
     val rdd = FDsUtils.readAsRdd(sc, filePath, del)
+
+    // create the map which save cutted leaves
+
 
     // get all the partitions by common attributes
     val partitions = new Array[RDD[scala.List[Array[String]]]](newColSize)
@@ -398,7 +401,6 @@ object FDsMine {
     val equalAttrs = equalAttrMap.keySet
     for (fd <- tmp) {
       val list = mutable.ListBuffer.empty[mutable.ListBuffer[Int]]
-      list.append(mutable.ListBuffer.empty[Int])
       fd._1.foreach {i =>
         if (equalAttrs contains i) {
           val copy = list.clone()
