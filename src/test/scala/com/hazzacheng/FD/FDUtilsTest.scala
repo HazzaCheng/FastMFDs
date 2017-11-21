@@ -3,7 +3,6 @@ package com.hazzacheng.FD
 import org.junit.runner.RunWith
 import org.scalatest.FunSuite
 import org.scalatest.junit.JUnitRunner
-
 import scala.collection.mutable
 
 /**
@@ -121,6 +120,38 @@ class FDUtilsTest extends FunSuite {
       println("fd size: " + fd.length)
     }
     //fd.foreach(println)
+  }
+
+  test("checkfd"){
+    val data = List(Array("mike", "have", "rice", "white", "201"),
+      Array("mike", "is", "rice", "white", "202"),
+      Array("mike", "are", "beef", "white", "203"),
+      Array("mike", "has", "middle", "white", "204"),
+      Array("mike", "be", "roye", "white", "205"),
+      Array("mike", "can", "rice", "white", "206"),
+      Array("mike", "may", "anod", "white", "207"),
+      Array("mike", "might", "hha", "white", "208"),
+      Array("mike", "could", "rice", "white", "209"),
+      Array("mike", "is", "rice", "white", "210"),
+      Array("mike", "are", "beef", "white", "211"),
+      Array("mike", "be", "roye", "white", "212"),
+      Array("mike", "can", "rice", "white", "213"),
+      Array("mike", "may", "rice", "white", "214"),
+      Array("mike", "have", "rice", "white", "215"),
+      Array("mike", "have", "koLL", "white", "216"),
+      Array("mike", "can", "rice", "white", "217"),
+      Array("mike", "can", "pid", "white", "218"),
+      Array("mike", "is", "rice", "white", "219"),
+      Array("mike", "is", "rice", "white", "220"),
+      Array("mike", "are", "beaf", "white", "221"),
+      Array("mike", "is", "rice", "white", "222"),
+      Array("mike", "have", "wrvc", "white", "223"),
+      Array("mike", "might", "awhk", "white", "224"),
+      Array("mike", "have", "rice", "white", "225"),
+      Array("mike", "could", "iopm", "white", "226"),
+      Array("mike", "have", "rwww", "white", "227"))
+
+
   }
 
 }

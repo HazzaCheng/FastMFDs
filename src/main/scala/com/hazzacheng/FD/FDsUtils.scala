@@ -37,6 +37,7 @@ object FDsUtils {
     val colSize = df.first.length
     val orders = df.columns.map(col => df.groupBy(col).count().count())
       .zipWithIndex.sortWith((x, y) => x._1 > y._1)
+
     df.unpersist()
     (colSize, orders.map(x => (x._2 + 1, x._1)))
   }
@@ -275,7 +276,7 @@ object FDsUtils {
       val left = takeAttrLHS(d, lhs)
       val right = takeAttrRHS(d, rhs)
       if(dict.contains(left)){
-        for(i <- true_rhs){
+        for(i <- true_rhs.toList){
           if(!dict(left)(i).equals(right(i))){
             true_rhs -= i
             res += i
