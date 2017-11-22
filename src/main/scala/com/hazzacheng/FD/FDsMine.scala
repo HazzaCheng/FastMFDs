@@ -36,7 +36,7 @@ object FDsMine {
     val (equalAttr, withoutEqualAttr) = getEqualAttr(singleFDs)
     // get new orders
     val (equalAttrMap, ordersMap, orders, del) = createNewOrders(equalAttr, singleLhsCount, colSize)
-    val newColSize = colSize - equalAttr.length
+    val newColSize = colSize - equalAttrMap.size
     // create the new single lhs fds
     val bottomFDs = getNewBottomFDs(withoutEqualAttr, ordersMap, equalAttrMap)
     // check the fds with the longest lhs
@@ -54,7 +54,9 @@ object FDsMine {
     val rdd = FDsUtils.readAsRdd(sc, filePath, del)
 
     // get all the partitions by common attributes
-    val partitions = new Array[RDD[scala.List[Array[String]]]](newColSize)
+    val partitions = new Array[RDD[List[Array[String]]]](newColSize)
+    println("====newColSize: " + newColSize)
+    println("====Size- orders: " + orders.length)
     for (i <- orders)
       partitions(i._1 - 1) = repart(sc, rdd, i._1).persist(StorageLevel.MEMORY_AND_DISK_SER)
     // TODO: need to test different StorageLevel
