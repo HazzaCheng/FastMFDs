@@ -90,31 +90,75 @@ class FDsMineTest extends FunSuite {
     var size = 0
     candidates.foreach(size += _._2.size)
     //    println("Total hava " + size)
+
     assert(size == colSize * (1 << colSize - 1) - colSize)
   }
 
   test("remove top and bottom"){
-    val newColSize = 3
+    val newColSize = 4
     val candidates = removeTopAndBottom(getCandidates(newColSize), newColSize)
+    val expected = List(
+      (Set(1, 3), Set(2, 4)),
+      (Set(1, 2), Set(3, 4)),
+      (Set(1, 4), Set(2, 3)),
+      (Set(2, 3), Set(1, 4)),
+      (Set(2, 4), Set(1, 3)),
+      (Set(3, 4), Set(1, 2))
+    )
 
-    assert(candidates.toList == List((Set(1,3),Set(2)), (Set(1,2),Set(3)),
-      (Set(2),Set(1,3)), (Set(3),Set(1, 2)), (Set(2, 3),Set(1)), (Set(1),Set(2, 3))))
+    assert(candidates.toSet == expected.toSet)
+  }
+
+  test("is subset") {
+    val s1 = Set(1)
+    val b1 = Set(1, 3)
+    assert(isSubSet(b1, s1) == true)
+
+    val s2 = Set(1, 3, 4)
+    val b2 = Set(1, 2, 3, 4, 5)
+    assert(isSubSet(b2, s2) == true)
+
+    val s3 = Set(1, 3, 4)
+    val b3 = Set(1, 2, 4, 5)
+    assert(isSubSet(b3, s3) == false)
   }
 
   test("cut from down to top"){
     val newColSize = 3
     val candidates = removeTopAndBottom(getCandidates(newColSize), newColSize)
     val bottomFDs = Array((Set(1), 3))
+
     cutFromDownToTop(candidates, bottomFDs)
-    assert(candidates.toList == List((Set(1, 3),Set(2)), (Set(2),Set(1, 3)), (Set(3),Set(1, 2)), (Set(2, 3),Set(1)), (Set(1),Set(2, 3))))
+    val expected = List(
+      (Set(1, 3), Set(2, 4)),
+      (Set(1, 2), Set(4)),
+      (Set(1, 4), Set(2)),
+      (Set(2, 3), Set(1, 4)),
+      (Set(2, 4), Set(1, 3)),
+      (Set(3, 4), Set(1, 2))
+    )
+
+    candidates.toList.foreach(println)
+
+    assert(candidates.toSet == expected.toSet)
   }
 
   test("cut from top to down"){
     val newColSize = 3
     val candidates = removeTopAndBottom(getCandidates(newColSize), newColSize)
-    val topFDs = mutable.Set((Set(1,2),3))
+    val topFDs = mutable.Set((Set(1, 2, 3), 4))
+
     cutFromTopToDown(candidates, topFDs)
-    assert(candidates.toList == List((Set(1, 3),Set(2)), (Set(2),Set(1)), (Set(3),Set(1, 2)), (Set(2, 3),Set(1)), (Set(1),Set(2))))
+    val expected = List(
+      (Set(1, 3), Set(2)),
+      (Set(1, 2), Set(3)),
+      (Set(1, 4), Set(2, 3)),
+      (Set(2, 3), Set(1)),
+      (Set(2, 4), Set(1, 3)),
+      (Set(3, 4), Set(1, 2))
+    )
+
+    assert(candidates.toSet == expected.toSet)
   }
 
   test("get target candidates"){

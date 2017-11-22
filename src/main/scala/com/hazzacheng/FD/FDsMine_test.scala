@@ -356,8 +356,8 @@ object FDsMine_test {
   }
 
   def removeTopAndBottom(candidates: mutable.HashMap[Set[Int], mutable.Set[Int]],
-                       colSize: Int): mutable.HashMap[Set[Int], mutable.Set[Int]] = {
-    val newCandidates = candidates.filter(_._1 != colSize && colSize != 1)
+                         colSize: Int): mutable.HashMap[Set[Int], mutable.Set[Int]] = {
+    val newCandidates = candidates.filter(x => x._1.size != colSize - 1 && x._1.size!= 1)
 
     newCandidates
   }
