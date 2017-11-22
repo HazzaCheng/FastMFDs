@@ -127,7 +127,7 @@ object FDsMine_test {
 
   private def getSingleLhsCount(df: DataFrame, colSize: Int): List[(Int, Int)] = {
     val res = df.columns.map(col => df.groupBy(col).count().count())
-      .zipWithIndex.map(x => (x._2, x._1.toInt))
+      .zipWithIndex.map(x => (x._2 + 1, x._1.toInt))
 
     res.toList
   }
