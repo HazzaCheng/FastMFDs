@@ -25,7 +25,7 @@ class FDsMineTest extends FunSuite {
     sortedSubSets.reduce(_ + "\n" + _ )
   }
 
-  test("get equal attributes") {
+  test("getEqualAttr") {
     val fds = Array((1, 2), (3, 5), (2, 1), (3, 8), (5, 3), (1, 10), (2, 6), (8, 3))
     val (equalAttrs, newFDs) = getEqualAttr(fds)
     val expected1 = List((1, 2), (3, 5), (3, 8))
@@ -35,7 +35,7 @@ class FDsMineTest extends FunSuite {
     assert(newFDs.toSet == expected2.toSet)
   }
 
-  test("create new orders") {
+  test("createNewOrders") {
     val equalAttr = List((1, 2), (3, 4))
     val singleLhsCount = List((1, 100), (2, 50), (3, 66), (4, 95))
     val colSize = 4
@@ -47,7 +47,7 @@ class FDsMineTest extends FunSuite {
     assert(List(1, 2) == del)
   }
 
-  test("get bottom FDs"){
+  test("getNewBottomFDs"){
     val withoutEqualAttr = Array((1, 3), (2, 3), (1, 4), (2, 4), (6, 7))
     val ordersMap = Map(1 -> 1, 2 -> 4, 6 -> 6, 7 -> 7)
     val equalAttrMap = Map(1 -> 2, 4 -> 3)
@@ -56,14 +56,14 @@ class FDsMineTest extends FunSuite {
     assert(bottomFDs.toList == List((Set(1), 2), (Set(6), 7)))
   }
 
-  test("get longest Lhs"){
+  test("getLongestLhs"){
     val newColSize = 3
     val topCandidates = getLongestLhs(newColSize)
 
     assert(topCandidates.toList == List((Set(1,2),3),(Set(1,3),2),(Set(2,3),1)))
   }
 
-  test("cut in top level"){
+  test("cutInTopLevel"){
     val newColSize = 3
     val topCandidates = getLongestLhs(newColSize)
     val bottomFDs = Array((Set(1), 3))
@@ -83,7 +83,7 @@ class FDsMineTest extends FunSuite {
   }
 
 
-  test("get candidates") {
+  test("getCandidates") {
     val colSize = 10
     val candidates = getCandidates(10)
 
@@ -94,7 +94,7 @@ class FDsMineTest extends FunSuite {
     assert(size == colSize * (1 << colSize - 1) - colSize)
   }
 
-  test("remove top and bottom"){
+  test("removeTopAndBottom"){
     val newColSize = 4
     val candidates = removeTopAndBottom(getCandidates(newColSize), newColSize)
     val expected = List(
@@ -109,7 +109,7 @@ class FDsMineTest extends FunSuite {
     assert(candidates.toSet == expected.toSet)
   }
 
-  test("is subset") {
+  test("isSubset") {
     val s1 = Set(1)
     val b1 = Set(1, 3)
     assert(isSubSet(b1, s1) == true)
@@ -123,8 +123,27 @@ class FDsMineTest extends FunSuite {
     assert(isSubSet(b3, s3) == false)
   }
 
-  test("cut from down to top"){
-    val newColSize = 3
+  test("cutInCandidates") {
+    val newColSize = 4
+    val candidates = removeTopAndBottom(getCandidates(newColSize), newColSize)
+    val lhs = List(Set(1, 3), Set(3, 4))
+    val rhs = 2
+
+    cutInCandidates(candidates, lhs, rhs)
+    val expected = List(
+      (Set(1, 3), Set(4)),
+      (Set(1, 2), Set(3, 4)),
+      (Set(1, 4), Set(2, 3)),
+      (Set(2, 3), Set(1, 4)),
+      (Set(2, 4), Set(1, 3)),
+      (Set(3, 4), Set(1))
+    )
+
+    assert(candidates.toSet == expected.toSet)
+  }
+
+  test("cutFromDownToTop"){
+    val newColSize = 4
     val candidates = removeTopAndBottom(getCandidates(newColSize), newColSize)
     val bottomFDs = Array((Set(1), 3))
 
@@ -138,13 +157,11 @@ class FDsMineTest extends FunSuite {
       (Set(3, 4), Set(1, 2))
     )
 
-    candidates.toList.foreach(println)
-
     assert(candidates.toSet == expected.toSet)
   }
 
-  test("cut from top to down"){
-    val newColSize = 3
+  test("cutFromTopToDown"){
+    val newColSize = 4
     val candidates = removeTopAndBottom(getCandidates(newColSize), newColSize)
     val topFDs = mutable.Set((Set(1, 2, 3), 4))
 
@@ -161,7 +178,7 @@ class FDsMineTest extends FunSuite {
     assert(candidates.toSet == expected.toSet)
   }
 
-  test("get target candidates"){
+  test("getTargetCandidates"){
     var candidates = mutable.HashMap.empty[Set[Int], mutable.Set[Int]]
     candidates += Set(1,2) -> mutable.Set(3,4)
     candidates += Set(1,3) -> mutable.Set(2,4)
@@ -171,15 +188,33 @@ class FDsMineTest extends FunSuite {
     candidates += Set(1,2,3) -> mutable.Set(4)
     val common = 1
     val level = 2
+    val expected = List(
+      (Set(1, 3), Set(2, 4)),
+      (Set(1, 2), Set(3, 4)),
+      (Set(1, 4), Set(2, 3))
+    )
+
     val toChecked = getTargetCandidates(candidates, common, level).toList
-    assert(toChecked == List((Set(1, 3),Set(2, 4)), (Set(1, 2),Set(3, 4)), (Set(1, 4),Set(2, 3))))
+    assert(toChecked == expected)
   }
 
-  test("recover all fds"){
-    val results = List((Set(1,2,3),4))
-    val equalAttrMap = Map((1,2),(3,4))
-    val ordersMap = Map((1,1),(2,3),(3,5),(4,6))
+  test("recoverAllFds"){
+    val results = List((Set(1, 2, 3), 4))
+    val equalAttrMap = Map(1 -> 2, 3 -> 4)
+    val ordersMap = Map(1 -> 1, 2 -> 3, 3 -> 5, 4 -> 6)
     val fds = recoverAllFDs(results, equalAttrMap, ordersMap)
-    println(fds)
+
+    val expected = Map(
+      Set(1, 3, 5) -> List(6),
+      Set(2, 3, 5) -> List(6),
+      Set(1, 4, 5) -> List(6),
+      Set(2, 4, 5) -> List(6),
+      Set(1) -> List(2),
+      Set(2) -> List(1),
+      Set(3) -> List(4),
+      Set(4) -> List(3)
+    )
+
+    assert(expected.toSet == fds.toSet)
   }
 }

@@ -57,7 +57,7 @@ object FDsMine {
     val partitions = new Array[RDD[scala.List[Array[String]]]](newColSize)
     for (i <- orders)
       partitions(i._1 - 1) = repart(sc, rdd, i._1).persist(StorageLevel.MEMORY_AND_DISK_SER)
-      // TODO: need to test different StorageLevel
+    // TODO: need to test different StorageLevel
 
 
     for (level <- 2 until (newColSize - 1)) {
@@ -217,8 +217,8 @@ object FDsMine {
   }
 
   private def repart(sc: SparkContext,
-             rdd: RDD[Array[String]],
-             attribute: Int): RDD[List[Array[String]]] = {
+                     rdd: RDD[Array[String]],
+                     attribute: Int): RDD[List[Array[String]]] = {
     val partitions = rdd.map(line => (line(attribute - 1), List(line)))
       .reduceByKey(_ ++ _).map(_._2)
 
@@ -242,17 +242,17 @@ object FDsMine {
   }
 
   private def checkEachPartition(fdsBV: Broadcast[List[(Set[Int], mutable.Set[Int])]],
-               partition: List[Array[String]],
-               colSize: Int): List[(Set[Int], Int)] = {
+                                 partition: List[Array[String]],
+                                 colSize: Int): List[(Set[Int], Int)] = {
     val minimalFDs = fdsBV.value.flatMap(fd => checkFD(partition, fd._1, fd._2, colSize))
 
     minimalFDs
   }
 
   private def checkFD(partition: List[Array[String]],
-            lhs: Set[Int],
-            rhs: mutable.Set[Int],
-            colSize: Int): List[(Set[Int], Int)] = {
+                      lhs: Set[Int],
+                      rhs: mutable.Set[Int],
+                      colSize: Int): List[(Set[Int], Int)] = {
     val true_rhs = rhs.clone()
     val dict = mutable.HashMap.empty[String, Array[String]]
 
@@ -351,8 +351,8 @@ object FDsMine {
   }
 
   def cutInCandidates(candidates: mutable.HashMap[Set[Int], mutable.Set[Int]],
-          lhs: List[Set[Int]],
-          rhs: Int): Unit = {
+                      lhs: List[Set[Int]],
+                      rhs: Int): Unit = {
     for (l <- lhs) {
       val value = candidates(l)
       if (value contains rhs) {
@@ -372,7 +372,7 @@ object FDsMine {
   }
 
   private def takeAttrLHS(arr: Array[String],
-                  attributes: Set[Int]): String = {
+                          attributes: Set[Int]): String = {
     val s = mutable.StringBuilder.newBuilder
     attributes.toList.foreach(attr => s.append(arr(attr - 1)))
 
@@ -380,8 +380,8 @@ object FDsMine {
   }
 
   private def takeAttrRHS(arr: Array[String],
-                  attributes: mutable.Set[Int],
-                  colSize: Int): Array[String] = {
+                          attributes: mutable.Set[Int],
+                          colSize: Int): Array[String] = {
     val res = new Array[String](colSize + 1)
     attributes.toList.foreach(attr => res(attr) = arr(attr - 1))
     res
@@ -421,6 +421,11 @@ object FDsMine {
     for (fd <- fds.toList)
       if (equalAttrs contains fd._2)
         fds.append((fd._1, equalAttrMap(fd._2)))
+
+    equalAttrMap.toList.foreach{x =>
+      fds.append((Set[Int](x._1), x._2))
+      fds.append((Set[Int](x._2), x._1))
+    }
 
     fds.toList.groupBy(_._1).map(x => (x._1, x._2.map(_._2)))
   }

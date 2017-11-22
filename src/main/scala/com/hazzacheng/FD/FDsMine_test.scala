@@ -490,6 +490,11 @@ object FDsMine_test {
       if (equalAttrs contains fd._2)
         fds.append((fd._1, equalAttrMap(fd._2)))
 
+    equalAttrMap.toList.foreach{x =>
+      fds.append((Set[Int](x._1), x._2))
+      fds.append((Set[Int](x._2), x._1))
+    }
+
     fds.toList.groupBy(_._1).map(x => (x._1, x._2.map(_._2)))
   }
 

@@ -100,13 +100,13 @@ class FDsMine_testTest extends FunSuite{
         assert(fds == map)
     }
 
-    test("get cut FDs Map and update"){
-        val candidates =  mutable.HashMap.empty[Set[Int], mutable.Set[Int]]
-        val failFDs = mutable.Set[(Set[Int], Int)]
-        val partWithFailFDs = ""
-        val levelMap = ""
-        val level = ""
-        //val cuttedFDsMap = getCuttedFDsMap(candidates, failFDs)
-        //updateLevelMap(cuttedFDsMap, partWithFailFDs, levelMap, level)
-    }
+//    test("get cut FDs Map and update"){
+//        val candidates =  mutable.HashMap.empty[Set[Int], mutable.Set[Int]]
+//        val failFDs = mutable.Set[(Set[Int], Int)]
+//        val partWithFailFDs = ""
+//        val levelMap = ""
+//        val level = ""
+//        //val cuttedFDsMap = getCuttedFDsMap(candidates, failFDs)
+//        //updateLevelMap(cuttedFDsMap, partWithFailFDs, levelMap, level)
+//    }
 }
