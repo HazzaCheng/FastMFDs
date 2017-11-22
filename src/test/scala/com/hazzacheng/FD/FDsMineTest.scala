@@ -41,7 +41,7 @@ class FDsMineTest extends FunSuite {
     val colSize = 4
     val (equalAttrMap, ordersMap, orders, del) = createNewOrders(equalAttr, singleLhsCount, colSize)
 
-    assert(equalAttrMap == Map(1 -> 2, 4 -> 3))
+    assert(equalAttrMap == Map(1 -> Set(2), 4 -> Set(3)))
     assert(ordersMap == Map(1 -> 1, 2 -> 4))
     assert(orders.toList == List((1, 100), (2, 95)))
     assert(List(1, 2) == del)
@@ -50,9 +50,9 @@ class FDsMineTest extends FunSuite {
   test("getNewBottomFDs"){
     val withoutEqualAttr = Array((1, 3), (2, 3), (1, 4), (2, 4), (6, 7))
     val ordersMap = Map(1 -> 1, 2 -> 4, 6 -> 6, 7 -> 7)
-    val equalAttrMap = Map(1 -> 2, 4 -> 3)
+    val equalAttrMap = Map(1 -> Set(2,9), 4 -> Set(3))
     val bottomFDs = getNewBottomFDs(withoutEqualAttr, ordersMap, equalAttrMap)
-
+    println(bottomFDs.toList.toString())
     assert(bottomFDs.toList == List((Set(1), 2), (Set(6), 7)))
   }
 
@@ -200,7 +200,7 @@ class FDsMineTest extends FunSuite {
 
   test("recoverAllFds"){
     val results = List((Set(1, 2, 3), 4))
-    val equalAttrMap = Map(1 -> 2, 3 -> 4)
+    val equalAttrMap = Map(1 -> Set(2), 3 -> Set(4))
     val ordersMap = Map(1 -> 1, 2 -> 3, 3 -> 5, 4 -> 6)
     val fds = recoverAllFDs(results, equalAttrMap, ordersMap)
 

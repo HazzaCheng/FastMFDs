@@ -32,20 +32,26 @@ object FDsMine {
 
     // get fds with single lhs
     val (singleFDs, singleLhsCount) = getBottomFDs(df, colSize)
+    println("=====singleFDs: " + singleFDs.toList.toString())
     // get equal attributes
     val (equalAttr, withoutEqualAttr) = getEqualAttr(singleFDs)
     // get new orders
     val (equalAttrMap, ordersMap, orders, del) = createNewOrders(equalAttr, singleLhsCount, colSize)
-    val newColSize = colSize - equalAttrMap.size
+    println("=====ordersMap: " + orders.toList.toString())
+    val newColSize = colSize - del.size
     // create the new single lhs fds
     val bottomFDs = getNewBottomFDs(withoutEqualAttr, ordersMap, equalAttrMap)
+    println("=====new bottomFDs: " + bottomFDs.toList.toString())
     // check the fds with the longest lhs
     val topCandidates = getLongestLhs(newColSize)
+    println("=====top candidates: " + topCandidates.toList.toString())
     cutInTopLevel(topCandidates, bottomFDs)
     val topFDs = getTopFDs(df, topCandidates)
+    println("=====top FDs: " + topFDs.toList.toString())
     df.unpersist()
     // get all candidates FD without bottom level and top level
     val candidates = removeTopAndBottom(getCandidates(newColSize), newColSize)
+    println("=====remove top and bottom candidates: " + candidates.toList.toString())
     // cut from bottom level and top level
     cutFromDownToTop(candidates, bottomFDs)
     cutFromTopToDown(candidates, topFDs)
@@ -86,10 +92,10 @@ object FDsMine {
 
     // check the top level
     if (topFDs.nonEmpty) results ++= topFDs
-
+    println("=====results: " + results.toList.toString())
     // recover all fds
     val fds = recoverAllFDs(results.toList, equalAttrMap, ordersMap)
-
+    println("=====recover All FDs: " + fds.toList.toString())
     fds
   }
 
@@ -150,25 +156,49 @@ object FDsMine {
 
   def createNewOrders(equalAttr: List[(Int, Int)],
                       singleLhsCount: List[(Int, Int)],
-                      colSize: Int): (Map[Int, Int], Map[Int, Int], Array[(Int, Int)], List[Int]) = {
+                      colSize: Int): (Map[Int, Set[Int]], Map[Int, Int], Array[(Int, Int)], List[Int]) = {
     val maps = singleLhsCount.toMap
-    val equalAttrMap = mutable.Map.empty[Int, Int]
+    val equalAttrMap = mutable.Map.empty[Int, Set[Int]]
     val ordersMap = mutable.Map.empty[Int, Int]
     val tmp = mutable.Set.empty[Int]
     val del = mutable.ListBuffer.empty[Int]
+    val eqM = mutable.HashMap.empty[Int, mutable.Set[Int]]
+    equalAttr.foreach(x => if(eqM.contains(x._1))eqM(x._1) += x._2 else eqM += x._1 -> mutable.Set(x._2))
     Range(1, colSize + 1).foreach(tmp.add(_))
-
-    equalAttr.foreach{x =>
-      if (maps(x._1) > maps(x._2)) {
-        equalAttrMap.put(x._1, x._2)
-        tmp.remove(x._2)
-        del.append(x._2 - 1)
-      } else {
-        equalAttrMap.put(x._2, x._1)
-        tmp.remove(x._1)
-        del.append(x._1 - 1)
+    val equal_attrs = mutable.Set.empty[Set[Int]]
+    equalAttr.foreach(pair => {
+      val equal = mutable.Set.empty[Int]
+      equal += pair._1
+      equal += pair._2
+      if(eqM.contains(pair._1) && eqM.contains(pair._2)){
+        equal ++= eqM(pair._1)
+        equal ++= eqM(pair._2)
       }
-    }
+      equal_attrs += equal.toSet
+    })
+    println("equal_attr: " + equal_attrs.toList.toString())
+    equal_attrs.map(x => {
+      val y = x.toList
+      y.map(y0 => (y0, maps(y0))).sortWith((a, b) => a._2 > b._2).map(y1 => y1._1).toArray
+    }).foreach(x => {
+      val y0 = x.toSet - x(0)
+      equalAttrMap.put(x(0), y0)
+      y0.foreach(y => {
+        tmp.remove(y)
+        del.append(y - 1)
+      })
+    })
+//    equalAttr.foreach{x =>
+//      if (maps(x._1) > maps(x._2)) {
+//        equalAttrMap.put(x._1, x._2)
+//        tmp.remove(x._2)
+//        del.append(x._2 - 1)
+//      } else {
+//        equalAttrMap.put(x._2, x._1)
+//        tmp.remove(x._1)
+//        del.append(x._1 - 1)
+//      }
+//    }
 
     var count = 1
     for (i <- tmp.toList.sorted) {
@@ -184,12 +214,20 @@ object FDsMine {
 
   def getNewBottomFDs(singleFDs: Array[(Int, Int)],
                       ordersMap: Map[Int, Int],
-                      equalAttrMap: Map[Int, Int]): Array[(Set[Int], Int)] = {
-    val equalAttrs = equalAttrMap.values.toSet
+                      equalAttrMap: Map[Int, Set[Int]]): Array[(Set[Int], Int)] = {
+    //val equalAttrs = equalAttrMap.values.toSet
     val swappedMap = ordersMap.map(x => (x._2, x._1))
-    val fds = singleFDs.filter(x => !equalAttrs.contains(x._1) && !equalAttrs.contains(x._2))
-      .map(x => (Set[Int](swappedMap(x._1)), swappedMap(x._2)))
-
+    val fds = singleFDs.map(x => {
+      var lhs = 0
+      var rhs = 0
+      val l = equalAttrMap.filter(_._2.contains(x._1))
+      val r = equalAttrMap.filter(_._2.contains(x._2))
+      if(l.nonEmpty)lhs = l.head._1
+      else lhs = x._1
+      if(r.nonEmpty)rhs = r.head._1
+      else rhs = x._2
+      (lhs, rhs)
+    }).distinct.map(x => (Set[Int](swappedMap(x._1)), swappedMap(x._2)))
     fds
   }
 
@@ -390,7 +428,7 @@ object FDsMine {
   }
 
   def recoverAllFDs(results: List[(Set[Int], Int)],
-                    equalAttrMap: Map[Int, Int],
+                    equalAttrMap: Map[Int, Set[Int]],
                     ordersMap: Map[Int, Int]): Map[Set[Int], List[Int]]  = {
     val fds = mutable.ListBuffer.empty[(Set[Int], Int)]
 
@@ -406,15 +444,20 @@ object FDsMine {
       list.append(mutable.ListBuffer.empty[Int])
       fd._1.foreach {i =>
         if (equalAttrs contains i) {
-          val copy = mutable.ListBuffer.empty[mutable.ListBuffer[Int]]
-          list.foreach(x => {
-            val y = x.toList
-            copy.append(mutable.ListBuffer.empty[Int])
-            y.foreach(y0 => copy.last += y0)
-          })
+          val l = equalAttrMap(i).toArray
+          val copys = mutable.ListBuffer.empty[mutable.ListBuffer[Int]]
+          for (j <- l.indices) {
+            val copy = mutable.ListBuffer.empty[mutable.ListBuffer[Int]]
+            list.foreach(x => {
+              val y = x.toList
+              copy.append(mutable.ListBuffer.empty[Int])
+              y.foreach(y0 => copy.last += y0)
+            })
+            copy.foreach(_.append(l(j)))
+            copys ++= copy
+          }
           list.foreach(_.append(i))
-          copy.foreach(_.append(equalAttrMap(i)))
-          list ++= copy
+          list ++= copys
         } else list.foreach(_.append(i))
       }
       fds ++= list.map(x => (x.toSet, fd._2))
@@ -422,11 +465,18 @@ object FDsMine {
 
     for (fd <- fds.toList)
       if (equalAttrs contains fd._2)
-        fds.append((fd._1, equalAttrMap(fd._2)))
+        equalAttrMap(fd._2).foreach(y => fds.append((fd._1, y)))
 
     equalAttrMap.toList.foreach{x =>
-      fds.append((Set[Int](x._1), x._2))
-      fds.append((Set[Int](x._2), x._1))
+//      fds.append((Set[Int](x._1), x._2))
+//      fds.append((Set[Int](x._2), x._1))
+      val equalClass = (x._2 + x._1).toArray
+      for(i <- equalClass.indices){
+        for(j <- (i + 1) until equalClass.length){
+          fds.append((Set(equalClass(i)), equalClass(j)))
+          fds.append((Set(equalClass(j)), equalClass(i)))
+        }
+      }
     }
 
     fds.toList.groupBy(_._1).map(x => (x._1, x._2.map(_._2)))
