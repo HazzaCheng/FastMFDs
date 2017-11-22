@@ -195,11 +195,14 @@ object FDsMine_test {
   }
 
   def getNewBottomFDs(singleFDs: Array[(Int, Int)],
-                      ordersMap: Map[Int, Int]): Array[(Set[Int], Int)] = {
-    val reversedMap = ordersMap.map(x => (x._2, x._1))
-    val downLevel = singleFDs.map(x => (Set[Int](reversedMap(x._1)), reversedMap(x._2)))
+                      ordersMap: Map[Int, Int],
+                      equalAttrMap: Map[Int, Int]): Array[(Set[Int], Int)] = {
+    val equalAttrs = equalAttrMap.values.toSet
+    val swappedMap = ordersMap.map(x => (x._2, x._1))
+    val fds = singleFDs.filter(x => !equalAttrs.contains(x._1) && !equalAttrs.contains(x._2))
+      .map(x => (Set[Int](swappedMap(x._1)), swappedMap(x._2)))
 
-    downLevel
+    fds
   }
 
   def getLongestLhs(colSize: Int): mutable.Set[(Set[Int], Int)] = {
@@ -270,7 +273,7 @@ object FDsMine_test {
     val levelMap = levelMapBV.value.getOrElse(partition._1, mutable.HashSet.empty[(Set[Int], Int)])
     val minimalFDs = fdsBV.value.flatMap(fd => checkFD(partition._2, levelMap, fd._1, fd._2, colSize))
 
-    (String, minimalFDs)
+    (partition._1, minimalFDs)
   }
 
   private def checkFD(partition: List[Array[String]],

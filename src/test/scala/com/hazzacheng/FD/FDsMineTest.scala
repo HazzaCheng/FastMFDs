@@ -21,10 +21,12 @@ class FDsMineTest extends FunSuite {
 
   test("get equal attributes") {
     val fds = Array((1, 2), (3, 5), (2, 1), (3, 8), (5, 3), (1, 10), (2, 6), (8, 3))
-    val answer = FDsMine.getEqualAttr(fds)
-    val expected = List((1, 2), (3, 5), (3, 8))
+    val (equalAttrs, newFDs) = FDsMine.getEqualAttr(fds)
+    val expected1 = List((1, 2), (3, 5), (3, 8))
+    val expected2 = List((1, 10), (2, 6))
 
-    //assert(answer.toSet == expected.toSet)
+    assert(equalAttrs.toSet == expected1.toSet)
+    assert(newFDs.toSet == expected2.toSet)
   }
 
   test("create new orders") {
@@ -32,24 +34,20 @@ class FDsMineTest extends FunSuite {
     val singleLhsCount = List((1, 100), (2, 50), (3, 66), (4, 95))
     val colSize = 4
     val (equalAttrMap, ordersMap, orders, del) = createNewOrders(equalAttr, singleLhsCount, colSize)
+
+    assert(equalAttrMap == Map(1 -> 2, 4 -> 3))
     assert(ordersMap == Map(1 -> 1, 2 -> 4))
     assert(orders.toList == List((1, 100), (2, 95)))
     assert(List(1, 2) == del)
   }
 
-  test("get equal Attr"){
-    val singleFDs = Array((1,2),(2,1),(1,3),(2,3),(3,4),(4,3))
-    val (equalAttr, withoutEqualAttr) = getEqualAttr(singleFDs)
-    assert(equalAttr == List((1,2),(3,4)))
-    assert(withoutEqualAttr.toList == List((1,3),(2,3)))
-  }
-
   test("get bottom FDs"){
-    val withoutEqualAttr = Array((1, 3), (2, 3))
-    val ordersMap = Map(1 -> 1, 2 -> 4)
-    val equalAttr = List((1,2),(3,4))
-    val bottomFDs = getNewBottomFDs(withoutEqualAttr, ordersMap, equalAttr)
-    assert(bottomFDs.toList == List((Set(1), 2)))
+    val withoutEqualAttr = Array((1, 3), (2, 3), (1, 4), (2, 4), (6, 7))
+    val ordersMap = Map(1 -> 1, 2 -> 4, 6 -> 6, 7 -> 7)
+    val equalAttrMap = Map(1 -> 2, 4 -> 3)
+    val bottomFDs = getNewBottomFDs(withoutEqualAttr, ordersMap, equalAttrMap)
+
+    assert(bottomFDs.toList == List((Set(1), 2), (Set(6), 7)))
   }
 
   test("get longest Lhs"){

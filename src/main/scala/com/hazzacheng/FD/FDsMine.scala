@@ -39,7 +39,7 @@ object FDsMine {
     val (equalAttrMap, ordersMap, orders, del) = createNewOrders(equalAttr, singleLhsCount, colSize)
     val newColSize = colSize - equalAttr.length
     // create the new single lhs fds
-    val bottomFDs = getNewBottomFDs(withoutEqualAttr, ordersMap, equalAttr)
+    val bottomFDs = getNewBottomFDs(withoutEqualAttr, ordersMap, equalAttrMap)
     // check the fds with the longest lhs
     val topCandidates = getLongestLhs(newColSize)
     cutInTopLevel(topCandidates, bottomFDs)
@@ -182,14 +182,13 @@ object FDsMine {
 
   def getNewBottomFDs(singleFDs: Array[(Int, Int)],
                       ordersMap: Map[Int, Int],
-                     equalAttr: List[(Int,Int)]): Array[(Set[Int], Int)] = {
-    val addMap = equalAttr.flatMap(x => Array((x._1, x._2), (x._2, x._1))).toMap
-    //val reversedMap = ordersMap.map(x => (x._2, x._1))
-    var rMap = ordersMap.map(x => (x._2, x._1))
-    ordersMap.foreach(x => rMap += addMap(x._2) -> x._1)
-    val downLevel = singleFDs.map(x => (Set[Int](rMap(x._1)), rMap(x._2)))
+                      equalAttrMap: Map[Int, Int]): Array[(Set[Int], Int)] = {
+    val equalAttrs = equalAttrMap.values.toSet
+    val swappedMap = ordersMap.map(x => (x._2, x._1))
+    val fds = singleFDs.filter(x => !equalAttrs.contains(x._1) && !equalAttrs.contains(x._2))
+      .map(x => (Set[Int](swappedMap(x._1)), swappedMap(x._2)))
 
-    downLevel.distinct
+    fds
   }
 
   def getLongestLhs(colSize: Int): mutable.Set[(Set[Int], Int)] = {
