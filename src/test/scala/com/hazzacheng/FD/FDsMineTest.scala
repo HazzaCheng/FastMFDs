@@ -19,9 +19,15 @@ import scala.collection.mutable
 @RunWith(classOf[JUnitRunner])
 class FDsMineTest extends FunSuite {
 
+  def arr2str(subSets: Array[String]): String = {
+
+    val sortedSubSets = subSets.sorted
+    sortedSubSets.reduce(_ + "\n" + _ )
+  }
+
   test("get equal attributes") {
     val fds = Array((1, 2), (3, 5), (2, 1), (3, 8), (5, 3), (1, 10), (2, 6), (8, 3))
-    val (equalAttrs, newFDs) = FDsMine.getEqualAttr(fds)
+    val (equalAttrs, newFDs) = getEqualAttr(fds)
     val expected1 = List((1, 2), (3, 5), (3, 8))
     val expected2 = List((1, 10), (2, 6))
 
@@ -53,6 +59,7 @@ class FDsMineTest extends FunSuite {
   test("get longest Lhs"){
     val newColSize = 3
     val topCandidates = getLongestLhs(newColSize)
+
     assert(topCandidates.toList == List((Set(1,2),3),(Set(1,3),2),(Set(2,3),1)))
   }
 
@@ -61,12 +68,35 @@ class FDsMineTest extends FunSuite {
     val topCandidates = getLongestLhs(newColSize)
     val bottomFDs = Array((Set(1), 3))
     cutInTopLevel(topCandidates, bottomFDs)
+
     assert(topCandidates.toList == List((Set(1,3),2), (Set(2,3),1)))
+  }
+
+
+  test("getSubSets") {
+    val nums = Array(1, 2, 4)
+    val expected = Array(Set(1, 2, 4), Set(1, 2), Set(1, 4), Set(1),
+      Set(2), Set(2, 4), Set(4)).map(subSet => subSet.toString())
+    val res = getSubsets(nums).map(subSet => subSet.toString()).toArray
+
+    assert(arr2str(expected) == arr2str(res))
+  }
+
+
+  test("get candidates") {
+    val colSize = 10
+    val candidates = getCandidates(10)
+
+    var size = 0
+    candidates.foreach(size += _._2.size)
+    //    println("Total hava " + size)
+    assert(size == colSize * (1 << colSize - 1) - colSize)
   }
 
   test("remove top and bottom"){
     val newColSize = 3
     val candidates = removeTopAndBottom(getCandidates(newColSize), newColSize)
+
     assert(candidates.toList == List((Set(1,3),Set(2)), (Set(1,2),Set(3)),
       (Set(2),Set(1,3)), (Set(3),Set(1, 2)), (Set(2, 3),Set(1)), (Set(1),Set(2, 3))))
   }
