@@ -469,9 +469,15 @@ object FDsMine_test {
     val equalAttrs = equalAttrMap.keySet
     for (fd <- tmp) {
       val list = mutable.ListBuffer.empty[mutable.ListBuffer[Int]]
+      list.append(mutable.ListBuffer.empty[Int])
       fd._1.foreach {i =>
         if (equalAttrs contains i) {
-          val copy = list.clone()
+          val copy = mutable.ListBuffer.empty[mutable.ListBuffer[Int]]
+          list.foreach(x => {
+            val y = x.toList
+            copy.append(mutable.ListBuffer.empty[Int])
+            y.foreach(y0 => copy.last += y0)
+          })
           list.foreach(_.append(i))
           copy.foreach(_.append(equalAttrMap(i)))
           list ++= copy

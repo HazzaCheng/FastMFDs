@@ -397,37 +397,31 @@ object FDsMine {
       val rhs = ordersMap(x._2)
       (lhs, rhs)
     }
-    println("tmp: " + tmp.toString())
+
     val equalAttrs = equalAttrMap.keySet
     for (fd <- tmp) {
       val list = mutable.ListBuffer.empty[mutable.ListBuffer[Int]]
       list.append(mutable.ListBuffer.empty[Int])
       fd._1.foreach {i =>
-        println("i:" + i)
         if (equalAttrs contains i) {
           val copy = mutable.ListBuffer.empty[mutable.ListBuffer[Int]]
           list.foreach(x => {
-            copy += x
-            x :+ i
+            val y = x.toList
+            copy.append(mutable.ListBuffer.empty[Int])
+            y.foreach(y0 => copy.last += y0)
           })
-          println("list append i: " + list.toList.toString())
-          copy.foreach(_ :+ equalAttrMap(i))
-          println("copy append equal(i): " + copy.toList.toString())
+          list.foreach(_.append(i))
+          copy.foreach(_.append(equalAttrMap(i)))
           list ++= copy
-          println("list: " + list.toList.toString())
-        } else {
-          list.foreach(_ :+ i)
-          println("list: " + list.toList.toString())
-        }
+        } else list.foreach(_.append(i))
       }
       fds ++= list.map(x => (x.toSet, fd._2))
     }
-    println(fds.toList)
+
     for (fd <- fds.toList)
       if (equalAttrs contains fd._2)
         fds.append((fd._1, equalAttrMap(fd._2)))
 
     fds.toList.groupBy(_._1).map(x => (x._1, x._2.map(_._2)))
   }
-
 }
