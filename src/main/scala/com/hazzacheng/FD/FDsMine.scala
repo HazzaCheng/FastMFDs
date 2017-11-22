@@ -38,7 +38,7 @@ object FDsMine {
     // get new orders
     val (equalAttrMap, ordersMap, orders, del) = createNewOrders(equalAttr, singleLhsCount, colSize)
     println("=====ordersMap: " + orders.toList.toString())
-    val newColSize = colSize - del.size
+    val newColSize = orders.length
     // create the new single lhs fds
     val bottomFDs = getNewBottomFDs(withoutEqualAttr, ordersMap, equalAttrMap)
     println("=====new bottomFDs: " + bottomFDs.toList.toString())
