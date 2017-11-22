@@ -124,7 +124,7 @@ object FDsMine {
 
     for (i <- 0 until (colSize - 1))
       for (j <- (i + 1) until colSize)
-        tuples.append(((i, j), (columns(i), columns(j))))
+        tuples.append(((i + 1, j + 1), (columns(i), columns(j))))
 
     val res = tuples.toList.map(x =>
       (x._1, df.groupBy(x._2._1, x._2._2).count().count().toInt))
