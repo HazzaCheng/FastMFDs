@@ -32,7 +32,6 @@ object FDsMine {
 
     // get fds with single lhs
     val (singleFDs, singleLhsCount) = getBottomFDs(df, colSize)
-    df.unpersist()
     // get equal attributes
     val (equalAttr, withoutEqualAttr) = getEqualAttr(singleFDs)
     // get new orders
@@ -44,6 +43,7 @@ object FDsMine {
     val topCandidates = getLongestLhs(newColSize)
     cutInTopLevel(topCandidates, bottomFDs)
     val topFDs = getTopFDs(df, topCandidates)
+    df.unpersist()
     // get all candidates FD without bottom level and top level
     val candidates = removeTopAndBottom(getCandidates(newColSize), newColSize)
     // cut from bottom level and top level
