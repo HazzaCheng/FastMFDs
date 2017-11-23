@@ -28,7 +28,7 @@ class FDsMineTest extends FunSuite {
   test("getEqualAttr") {
     val fds = Array((1, 2), (3, 5), (2, 1), (3, 8), (5, 3), (1, 10), (2, 6), (8, 3))
     val (equalAttrs, newFDs) = getEqualAttr(fds)
-    val expected1 = List((1, 2), (3, 5), (3, 8))
+    val expected1 = List(Set(1, 2), Set(3, 5, 8))
     val expected2 = List((1, 10), (2, 6))
 
     assert(equalAttrs.toSet == expected1.toSet)
@@ -36,24 +36,24 @@ class FDsMineTest extends FunSuite {
   }
 
   test("createNewOrders") {
-    val equalAttr = List((1, 2), (3, 4))
-    val singleLhsCount = List((1, 100), (2, 50), (3, 66), (4, 95))
-    val colSize = 4
+    val equalAttr = List(Set(1, 2), Set(3, 4, 5))
+    val singleLhsCount = List((1, 100), (2, 50), (3, 66), (4, 95), (5, 72))
+    val colSize = 5
     val (equalAttrMap, ordersMap, orders, del) = createNewOrders(equalAttr, singleLhsCount, colSize)
 
-    assert(equalAttrMap == Map(1 -> Set(2), 4 -> Set(3)))
+    assert(equalAttrMap == Map(1 -> List(2), 4 -> List(3, 5)))
     assert(ordersMap == Map(1 -> 1, 2 -> 4))
-    assert(orders.toList == List((1, 100), (2, 95)))
-    assert(List(1, 2) == del)
+    assert(orders.toSet == Set((1, 100), (2, 95)))
+    assert(Set(2, 3, 5) == del.toSet)
   }
 
   test("getNewBottomFDs"){
     val withoutEqualAttr = Array((1, 3), (2, 3), (1, 4), (2, 4), (6, 7))
     val ordersMap = Map(1 -> 1, 2 -> 4, 6 -> 6, 7 -> 7)
-    val equalAttrMap = Map(1 -> Set(2,9), 4 -> Set(3))
+    val equalAttrMap = Map(1 -> List(2), 4 -> List(3, 5))
     val bottomFDs = getNewBottomFDs(withoutEqualAttr, ordersMap, equalAttrMap)
-    println(bottomFDs.toList.toString())
-    assert(bottomFDs.toList == List((Set(1), 2), (Set(6), 7)))
+
+    assert(bottomFDs.toSet == Set((Set(1), 2), (Set(6), 7)))
   }
 
   test("getLongestLhs"){
@@ -200,19 +200,24 @@ class FDsMineTest extends FunSuite {
 
   test("recoverAllFds"){
     val results = List((Set(1, 2, 3), 4))
-    val equalAttrMap = Map(1 -> Set(2), 3 -> Set(4))
+    val equalAttrMap = Map(1 -> List(2), 3 -> List(4, 8))
     val ordersMap = Map(1 -> 1, 2 -> 3, 3 -> 5, 4 -> 6)
     val fds = recoverAllFDs(results, equalAttrMap, ordersMap)
 
+    fds.foreach(println)
+
     val expected = Map(
       Set(1, 3, 5) -> List(6),
-      Set(2, 3, 5) -> List(6),
       Set(1, 4, 5) -> List(6),
+      Set(1, 8, 5) -> List(6),
+      Set(2, 3, 5) -> List(6),
       Set(2, 4, 5) -> List(6),
+      Set(2, 8, 5) -> List(6),
       Set(1) -> List(2),
       Set(2) -> List(1),
-      Set(3) -> List(4),
-      Set(4) -> List(3)
+      Set(3) -> List(4, 8),
+      Set(4) -> List(3, 8),
+      Set(8) -> List(3, 4)
     )
 
     assert(expected.toSet == fds.toSet)
