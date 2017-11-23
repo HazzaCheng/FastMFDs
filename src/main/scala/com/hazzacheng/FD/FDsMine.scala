@@ -43,13 +43,13 @@ object FDsMine {
     // check the fds with the longest lhs
     val topCandidates = getLongestLhs(newColSize)
     cutInTopLevel(topCandidates, bottomFDs)
-    val topFDs = getTopFDs(df, topCandidates)
+    val (topFDs, wrongTopFDs) = getTopFDs(df, topCandidates)
     df.unpersist()
     // get all candidates FD without bottom level and top level
     val candidates = removeTopAndBottom(getCandidates(newColSize), newColSize)
     // cut from bottom level and top level
     cutFromDownToTop(candidates, bottomFDs)
-    cutFromTopToDown(candidates, topFDs)
+    cutFromTopToDown(candidates, wrongTopFDs)
 
     // create the RDD
     val rdd = FDsUtils.readAsRdd(sc, filePath, del)
@@ -217,10 +217,11 @@ object FDsMine {
   }
 
   private def getTopFDs(df: DataFrame,
-                        topCandidates: mutable.Set[(Set[Int], Int)]): mutable.Set[(Set[Int], Int)] = {
+                        topCandidates: mutable.Set[(Set[Int], Int)]
+                       ): (mutable.Set[(Set[Int], Int)], mutable.Set[(Set[Int], Int)]) = {
     val cols = df.columns
 
-    val topFDs = topCandidates.filter{x =>
+    val (topFDs, wrong) = topCandidates.partition{x =>
       val lhs = x._1.map(y => cols(y - 1)).toArray
       val whole = df.groupBy(cols(x._2 - 1), lhs: _*).count().count()
       val left = df.groupBy(lhs.last, lhs.init: _*).count().count()
@@ -228,7 +229,7 @@ object FDsMine {
       whole == left
     }
 
-    topFDs
+    (topFDs, wrong)
   }
 
   private def repart(sc: SparkContext,
