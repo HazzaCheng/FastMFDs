@@ -36,7 +36,7 @@ object FDsMine_test {
     val (equalAttr, withoutEqualAttr) = getEqualAttr(singleFDs)
     // get new orders
     val (equalAttrMap, ordersMap, orders, del) = createNewOrders(equalAttr, singleLhsCount, colSize)
-    val newColSize = colSize - equalAttrMap.size
+    val newColSize = orders.length
     // create the new single lhs fds
     val bottomFDs = getNewBottomFDs(withoutEqualAttr, ordersMap, equalAttrMap)
     // check the fds with the longest lhs
@@ -454,7 +454,7 @@ object FDsMine_test {
   private def takeAttrLHS(arr: Array[String],
                   attributes: Set[Int]): String = {
     val s = mutable.StringBuilder.newBuilder
-    attributes.toList.foreach(attr => s.append(arr(attr - 1)))
+    attributes.toList.foreach(attr => s.append(arr(attr - 1) + " "))
 
     s.toString()
   }
