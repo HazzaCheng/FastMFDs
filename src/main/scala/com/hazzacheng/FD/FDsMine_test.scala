@@ -39,6 +39,7 @@ object FDsMine_test {
     val newColSize = orders.length
     // create the new single lhs fds
     val bottomFDs = getNewBottomFDs(withoutEqualAttr, ordersMap, equalAttrMap)
+    results ++= bottomFDs
     // check the fds with the longest lhs
     val topCandidates = getLongestLhs(newColSize)
     cutInTopLevel(topCandidates, bottomFDs)
