@@ -32,25 +32,35 @@ object FDsMine {
 
     // get fds with single lhs
     val (singleFDs, singleLhsCount) = getBottomFDs(df, colSize)
+    println("=====singleFDs: " + singleFDs.toList.toString)
     // get equal attributes
     val (equalAttr, withoutEqualAttr) = getEqualAttr(singleFDs)
+    println("=====equalAttr: " + equalAttr.toString())
     // get new orders
     val (equalAttrMap, ordersMap, orders, del) = createNewOrders(equalAttr, singleLhsCount, colSize)
+    println("=====equalAttrMap: " + equalAttrMap.toList.toString())
+    println("=====ordersMap: " + ordersMap.toList.toString())
+    println("=====orders: " + orders.toList.toString())
     val newColSize = orders.length
     // create the new single lhs fds
     val bottomFDs = getNewBottomFDs(withoutEqualAttr, ordersMap, equalAttrMap)
+    println("=====bottomFDs: " + bottomFDs.toList.toString())
     results ++= bottomFDs
     // check the fds with the longest lhs
     val topCandidates = getLongestLhs(newColSize)
+    println("=====topCandidates: " + topCandidates.toList.toString())
     cutInTopLevel(topCandidates, bottomFDs)
+    println("=====after cut top level: " + topCandidates.toList.toString())
     val (topFDs, wrongTopFDs) = getTopFDs(df, topCandidates)
+    println("=====true topFDs: " + topFDs.toList.toString())
     df.unpersist()
     // get all candidates FD without bottom level and top level
     val candidates = removeTopAndBottom(getCandidates(newColSize), newColSize)
+    println("=====candidates: " + candidates.toList.toString())
     // cut from bottom level and top level
     cutFromDownToTop(candidates, bottomFDs)
     cutFromTopToDown(candidates, wrongTopFDs)
-
+    println("=====after cut top and down: " + candidates.toList.toString())
     // create the RDD
     val rdd = FDsUtils.readAsRdd(sc, filePath, del)
 
@@ -66,9 +76,10 @@ object FDsMine {
         val partitionSize = common._2
         val partitionRDD = partitions(common._1 - 1)
         val toChecked = getTargetCandidates(candidates, common._1, level).toList
-
         if (toChecked.nonEmpty) {
+          println("======toChecked: " + "level: " + level + "common: " + common + " " + toChecked.toString())
           val minimalFDs = getMinimalsFDs(sc, partitionRDD, toChecked, results, partitionSize, newColSize)
+          if(minimalFDs.nonEmpty)println("=====minimalFDs: " + "level: " + level + "common: " + common + " " + minimalFDs.toList.toString())
           if (minimalFDs.nonEmpty) {
             cutFromDownToTop(candidates, minimalFDs)
             if (topFDs.nonEmpty) cutInTopLevel(topFDs, minimalFDs)
@@ -85,10 +96,10 @@ object FDsMine {
 
     // check the top level
     if (topFDs.nonEmpty) results ++= topFDs
-
+    println("=====before add results: " + results.toList.toString())
     // recover all fds
     val fds = recoverAllFDs(results.toList, equalAttrMap, ordersMap)
-
+    println("=====fds: " + fds.toList.toString())
     fds
   }
 
@@ -249,6 +260,12 @@ object FDsMine {
     val candidates = partitionsRDD.flatMap(p => checkEachPartition(fdsBV, p, colSize))
       .map(x => (x, 1)).reduceByKey(_ + _).collect()
     val minimalFDs = candidates.filter(_._2 == partitionSize).map(_._1)
+    println("========partition rdd size: " + partitionsRDD.count())
+    println("========partition size: " + partitionSize)
+    if(fds.toMap.contains(Set(4,7))) {
+      println("========Candidates:" + candidates.toList.toString())
+      println("========minimalFDs: " + minimalFDs.toList.toString())
+    }
 
     res ++= minimalFDs
     fdsBV.unpersist()
@@ -276,11 +293,18 @@ object FDsMine {
       val value = dict.getOrElse(left, null)
       if (value != null) {
         for (i <- true_rhs.toList)
-          if (!value(i).equals(right(i))) true_rhs.remove(i)
+          if (!value(i).equals(right(i))) {
+            if(lhs.size == 2 && lhs.contains(4) && lhs.contains(7)){
+              println("=====(4,7) -> rhs: " + i + "is wrong")
+            }
+            true_rhs.remove(i)
+          }
       } else dict.put(left, right)
       if (true_rhs.isEmpty) return List()
     })
-
+    if(lhs.size == 2 && lhs.contains(4) && lhs.contains(7)){
+      println("=====(4,7) -> true_rhs: " + true_rhs.toList.toString())
+    }
     true_rhs.map(r => (lhs, r)).toList
   }
 
@@ -411,9 +435,9 @@ object FDsMine {
       val rhs = ordersMap(x._2)
       (lhs, rhs)
     }
-
+    println("=====recover: tmp : " + tmp.toList.toString())
     val equalAttrs = equalAttrMap.keySet
-
+    println("=====recover: equalAttrs: " + equalAttrs.toString())
     for (fd <- tmp) {
       val list = mutable.ListBuffer.empty[mutable.ListBuffer[Int]]
       list.append(mutable.ListBuffer.empty[Int])
@@ -433,12 +457,13 @@ object FDsMine {
       }
       fds ++= list.map(x => (x.toSet, fd._2))
     }
-
+    println("=====recover: mid temp fds: " + fds.toList.toString())
     for (fd <- fds.toList)
       if (equalAttrs contains fd._2)
         equalAttrMap(fd._2).foreach(x => fds.append((fd._1, x)))
 
     val equalClass = equalAttrMap.toList.map(x => x._1 :: x._2)
+    println("=====recover: equalClass: " + equalClass.toString())
     equalClass.foreach{ec =>
        ec.foreach{x =>
          ec.foreach{y =>

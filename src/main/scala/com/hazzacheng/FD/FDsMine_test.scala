@@ -31,26 +31,45 @@ object FDsMine_test {
     val results = mutable.ListBuffer.empty[(Set[Int], Int)]
 
     // get fds with single lhs
+    time1 = System.currentTimeMillis()
     val (singleFDs, singleLhsCount) = getBottomFDs(df, colSize)
+    println("====USE TIME: getBottomFDs: " + (System.currentTimeMillis() - time1))
     // get equal attributes
+    time1 = System.currentTimeMillis()
     val (equalAttr, withoutEqualAttr) = getEqualAttr(singleFDs)
+    println("====USE TIME: getEqualAttr: " + (System.currentTimeMillis() - time1))
     // get new orders
+    time1 = System.currentTimeMillis()
     val (equalAttrMap, ordersMap, orders, del) = createNewOrders(equalAttr, singleLhsCount, colSize)
+    println("====USE TIME: createNewOrders: " + (System.currentTimeMillis() - time1))
     val newColSize = orders.length
     // create the new single lhs fds
+    time1 = System.currentTimeMillis()
     val bottomFDs = getNewBottomFDs(withoutEqualAttr, ordersMap, equalAttrMap)
+    println("====USE TIME: getNewBottomFDs: " + (System.currentTimeMillis() - time1))
     results ++= bottomFDs
     // check the fds with the longest lhs
+    time1 = System.currentTimeMillis()
     val topCandidates = getLongestLhs(newColSize)
+    println("====USE TIME: getLongestLhs: " + (System.currentTimeMillis() - time1))
+    time1 = System.currentTimeMillis()
     cutInTopLevel(topCandidates, bottomFDs)
+    println("====USE TIME: cutInTopLevel: " + (System.currentTimeMillis() - time1))
+    time1 = System.currentTimeMillis()
     val (topFDs, wrongTopFDs) = getTopFDs(df, topCandidates)
+    println("====USE TIME: getTopFDs: " + (System.currentTimeMillis() - time1))
     df.unpersist()
     // get all candidates FD without bottom level and top level
+    time1 = System.currentTimeMillis()
     val candidates = removeTopAndBottom(getCandidates(newColSize), newColSize)
+    println("====USE TIME: removeTopAndBottom: " + (System.currentTimeMillis() - time1))
     // cut from bottom level and top level
+    time1 = System.currentTimeMillis()
     cutFromDownToTop(candidates, bottomFDs)
+    println("====USE TIME: cutFromDownToTop: " + (System.currentTimeMillis() - time1))
+    time1 = System.currentTimeMillis()
     cutFromTopToDown(candidates, wrongTopFDs)
-
+    println("====USE TIME: cutFromTopToDown: " + (System.currentTimeMillis() - time1))
     // create the RDD
     val rdd = FDsUtils.readAsRdd(sc, filePath, del)
 
@@ -110,8 +129,9 @@ object FDsMine_test {
     if (topFDs.nonEmpty) results ++= topFDs
 
     // recover all fds
+    time1 = System.currentTimeMillis()
     val fds = recoverAllFDs(results.toList, equalAttrMap, ordersMap)
-
+    println("====USE TIME: recoverAllFDs: " + (System.currentTimeMillis() - time1))
     fds
   }
 
@@ -119,7 +139,6 @@ object FDsMine_test {
                            colSize: Int): (Array[(Int, Int)], List[(Int, Int)]) = {
     val lhs = getSingleLhsCount(df, colSize)
     val whole = getTwoAttributesCount(df, colSize)
-
     val map = whole.groupBy(_._2).map(x => (x._1, x._2.map(_._1)))
     val res = mutable.ListBuffer.empty[(Int, (Int, Int))]
 
