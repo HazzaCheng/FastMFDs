@@ -42,11 +42,15 @@ object FDsMine_test {
     time1 = System.currentTimeMillis()
     val (equalAttrMap, ordersMap, orders, del) = createNewOrders(equalAttr, singleLhsCount, colSize)
     println("====USE TIME: createNewOrders: " + (System.currentTimeMillis() - time1))
+    println("====orders: " + orders.toList.toString())
+    println("====ordersMap: " + ordersMap.toList.toString())
+    println("====equalAttrMap: " + equalAttrMap.toList.toString())
     val newColSize = orders.length
     // create the new single lhs fds
     time1 = System.currentTimeMillis()
     val bottomFDs = getNewBottomFDs(withoutEqualAttr, ordersMap, equalAttrMap)
     println("====USE TIME: getNewBottomFDs: " + (System.currentTimeMillis() - time1))
+    println("====Size bottomFDs: " + bottomFDs.length)
     results ++= bottomFDs
     // check the fds with the longest lhs
     time1 = System.currentTimeMillis()
@@ -59,10 +63,15 @@ object FDsMine_test {
     val (topFDs, wrongTopFDs) = getTopFDs(df, topCandidates)
     println("====USE TIME: getTopFDs: " + (System.currentTimeMillis() - time1))
     df.unpersist()
+    println("====Size true topFDs: " + topFDs.size)
+    println("====true TopFDs: " + topFDs.toList.toString())
+    println("====Size false topFDs: " + wrongTopFDs.size)
+    println("====false TopFDs: " + wrongTopFDs.toList.toString())
     // get all candidates FD without bottom level and top level
     time1 = System.currentTimeMillis()
     val candidates = removeTopAndBottom(getCandidates(newColSize), newColSize)
     println("====USE TIME: removeTopAndBottom: " + (System.currentTimeMillis() - time1))
+    println("====after remove top and down candidates: " + candidates.toList.length)
     // cut from bottom level and top level
     time1 = System.currentTimeMillis()
     cutFromDownToTop(candidates, bottomFDs)
@@ -80,12 +89,13 @@ object FDsMine_test {
 
     // get all the partitions by common attributes
     val partitions = new Array[RDD[(String, List[Array[String]])]](newColSize)
+    time1 = System.currentTimeMillis()
     for (common <- orders) {
       wholeMap.put(common._1, mutable.HashMap.empty[String, mutable.HashSet[(Set[Int], Int)]])
       partitions(common._1 - 1) = repart(sc, rdd, common._1).persist(StorageLevel.MEMORY_AND_DISK_SER)
       // TODO: need to test different StorageLevel
     }
-
+    println("====USE TIME: make partitions- " + (System.currentTimeMillis() - time1) )
     for (level <- 2 until (newColSize - 1)) {
       for (common <- orders) {
         time1 = System.currentTimeMillis()
@@ -103,13 +113,18 @@ object FDsMine_test {
         if (toChecked.nonEmpty) {
           val (minimalFDs, failFDs, partWithFailFDs) =
             getMinimalsFDs(sc, partitionRDD, toChecked, results, partitionSize, newColSize, levelMap)
+          println("====FailFDs: " + "level-" + level + " common-" + common._1 + " " + failFDs.toList.toString())
           if (minimalFDs.nonEmpty) {
+            time2 = System.currentTimeMillis()
             cutFromDownToTop(candidates, minimalFDs)
             if (topFDs.nonEmpty) cutInTopLevel(topFDs, minimalFDs)
+            println("====USE TIME: cutFromDownToTop and cutInTopLevel: " + "level-" + level + " common-" + common._1 + " " + (System.currentTimeMillis() - time2))
           }
           if (failFDs.nonEmpty) {
+            time2 = System.currentTimeMillis()
             val cuttedFDsMap = getCuttedFDsMap(candidates, failFDs)
             updateLevelMap(cuttedFDsMap, partWithFailFDs, levelMap, level)
+            println("====USE TIME: cuttedFDsMap and updateLevelMap: " + "level-" + level + " common-" + common._1 + " " + (System.currentTimeMillis() - time2))
           }
         }
 
