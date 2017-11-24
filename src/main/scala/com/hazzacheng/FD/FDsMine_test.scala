@@ -69,10 +69,17 @@ object FDsMine_test {
 
     for (level <- 2 until (newColSize - 1)) {
       for (common <- orders) {
+        time1 = System.currentTimeMillis()
+
         val partitionSize = common._2
         val partitionRDD = partitions(common._1 - 1)
         val toChecked = getTargetCandidates(candidates, common._1, level).toList
         val levelMap = wholeMap(common._1)
+
+        var sum = 0
+        toChecked.foreach(x => sum += x._2.size)
+        println("====SIZE: lhs-" + toChecked.size + " whole-" + sum)
+
 
         if (toChecked.nonEmpty) {
           val (minimalFDs, failFDs, partWithFailFDs) =
@@ -88,6 +95,8 @@ object FDsMine_test {
         }
 
         wholeMap.update(common._1, levelMap)
+
+        println("====USE TIME: level-" + level + " common-" + common._1 + " " + (System.currentTimeMillis() - time1))
       }
     }
 
@@ -133,7 +142,7 @@ object FDsMine_test {
     res.toList
   }
 
-  private def getTwoAttributesCount(df: DataFrame, colSize: Int): List[((Int, Int), Int)] = {
+  def getTwoAttributesCount(df: DataFrame, colSize: Int): List[((Int, Int), Int)] = {
     val columns = df.columns
     val tuples = mutable.ListBuffer.empty[((Int, Int), (String, String))]
 
