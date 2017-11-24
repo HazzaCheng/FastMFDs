@@ -447,7 +447,7 @@ object FDsMine_test {
     cutted.toList
   }
 
-  private def isSubSet(big: Set[Int], small: Set[Int]): Boolean = {
+  def isSubSet(big: Set[Int], small: Set[Int]): Boolean = {
     small.toList.foreach(s => if (!big.contains(s)) return false)
 
     true
