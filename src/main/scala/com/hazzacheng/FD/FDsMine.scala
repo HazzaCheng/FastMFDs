@@ -56,8 +56,6 @@ object FDsMine {
 
     // get all the partitions by common attributes
     val partitions = new Array[RDD[List[Array[String]]]](newColSize)
-    println("====newColSize: " + newColSize)
-    println("====Size- orders: " + orders.length)
     for (i <- orders)
       partitions(i._1 - 1) = repart(sc, rdd, i._1).persist(StorageLevel.MEMORY_AND_DISK_SER)
     // TODO: need to test different StorageLevel
