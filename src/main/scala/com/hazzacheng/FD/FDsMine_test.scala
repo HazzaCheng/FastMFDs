@@ -94,6 +94,7 @@ object FDsMine_test {
           val (minimalFDs, failFDs, partWithFailFDs) =
             getMinimalsFDs(sc, partitionRDD, toChecked, results, partitionSize, newColSize, levelMap)
           println("====SIZE FailFDs: " + "level-" + level + " common-" + common._1 + " " + failFDs.size)
+          println("====SIZE MinimalFDs: " + "level-" + level + " common-" + common._1 + " " + minimalFDs.size)
           if (minimalFDs.nonEmpty) {
             time2 = System.currentTimeMillis()
             cutFromDownToTop(candidates, minimalFDs)
