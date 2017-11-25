@@ -51,9 +51,7 @@ object FDsMine_test {
     df.unpersist()
     println("====SIZE false topFDs: " + wrongTopFDs.size)
     // get all candidates FD without bottom level and top level
-    time1 = System.currentTimeMillis()
     val candidates = removeTopAndBottom(getCandidates(newColSize), newColSize)
-    println("====USE TIME: removeTopAndBottom: " + (System.currentTimeMillis() - time1))
 
     var sumC = 0
     candidates.foreach(sumC += _._2.size)
