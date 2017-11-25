@@ -15,11 +15,11 @@ import scala.collection.mutable.ListBuffer
   * Description: 
   * User: HazzaCheng
   * Contact: hazzacheng@gmail.com
-  * Date: 2017-10-06
+  * Date: 2017-11-25
   * Time: 9:01 AM
   */
 
-object FDsMine_test {
+object MinimalFDsMine {
   private val parallelScaleFactor = 4
   var time1 = System.currentTimeMillis()
   var time2 = System.currentTimeMillis()
