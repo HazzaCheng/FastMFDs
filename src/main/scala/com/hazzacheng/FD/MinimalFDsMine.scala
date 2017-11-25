@@ -32,37 +32,22 @@ object MinimalFDsMine {
     val results = mutable.ListBuffer.empty[(Set[Int], Int)]
 
     // get fds with single lhs
-    time1 = System.currentTimeMillis()
     val (singleFDs, singleLhsCount) = getBottomFDs(df, colSize)
-    println("====USE TIME: getBottomFDs: " + (System.currentTimeMillis() - time1))
     // get equal attributes
     val (equalAttr, withoutEqualAttr) = getEqualAttr(singleFDs)
     // get new orders
     val (equalAttrMap, ordersMap, orders, del) = createNewOrders(equalAttr, singleLhsCount, colSize)
     val newColSize = orders.length
     // create the new single lhs fds
-    val bottomFDs = getNewBottomFDs(withoutEqualAttr, ordersMap, equalAttrMap)
+    val (bottomFDs, twoAttrsCountMap) = getNewBottomFDs(withoutEqualAttr, ordersMap, equalAttrMap)
     results ++= bottomFDs
     // check the fds with the longest lhs
     val topCandidates = getLongestLhs(newColSize)
     cutInTopLevel(topCandidates, bottomFDs)
-    time1 = System.currentTimeMillis()
     val (topFDs, wrongTopFDs) = getTopFDs(df, topCandidates)
-    println("====USE TIME: getTopFDs: " + (System.currentTimeMillis() - time1))
     df.unpersist()
-    println("====SIZE false topFDs: " + wrongTopFDs.size)
     // get all candidates FD without bottom level and top level
     val candidates = removeTopAndBottom(getCandidates(newColSize), newColSize)
-
-    var sumC = 0
-    candidates.foreach(sumC += _._2.size)
-    println("====SIZE after remove top and down candidates: LHS-"
-      + candidates.toList.length + " whole-" + sumC)
-    candidates.groupBy(_._1.size).foreach{x =>
-      var add = 0
-      x._2.foreach(add += _._2.size)
-      println("====SIZE in level" + x._1 + ": lhs-" + x._2.size + " whole-" + add)
-    }
 
     // cut from bottom level and top level
     cutFromDownToTop(candidates, bottomFDs)
@@ -90,34 +75,20 @@ object MinimalFDsMine {
         val toChecked = getTargetCandidates(candidates, common._1, level).toList
         val levelMap = wholeMap(common._1)
 
-        var sum = 0
-        toChecked.foreach(x => sum += x._2.size)
-        println("====SIZE level-" + level + " common-" +
-          common._1 + " : lhs-" + toChecked.size + " whole-" + sum)
-
-
         if (toChecked.nonEmpty) {
           val (minimalFDs, failFDs, partWithFailFDs) =
             getMinimalsFDs(sc, partitionRDD, toChecked, results, partitionSize, newColSize, levelMap)
-          println("====SIZE FailFDs: " + "level-" + level + " common-" + common._1 + " " + failFDs.size)
-          println("====SIZE MinimalFDs: " + "level-" + level + " common-" + common._1 + " " + minimalFDs.size)
           if (minimalFDs.nonEmpty) {
-            time2 = System.currentTimeMillis()
             cutFromDownToTop(candidates, minimalFDs)
             if (topFDs.nonEmpty) cutInTopLevel(topFDs, minimalFDs)
-            println("====USE TIME: cutFromDownToTop and cutInTopLevel: " + "level-" + level + " common-" + common._1 + " " + (System.currentTimeMillis() - time2))
           }
           if (failFDs.nonEmpty) {
-            time2 = System.currentTimeMillis()
             val cuttedFDsMap = getCuttedFDsMap(candidates, failFDs)
             updateLevelMap(cuttedFDsMap, partWithFailFDs, levelMap, level)
-            println("====USE TIME: cuttedFDsMap and updateLevelMap: " + "level-" + level + " common-" + common._1 + " " + (System.currentTimeMillis() - time2))
           }
         }
 
         wholeMap.update(common._1, levelMap)
-
-        println("====USE TIME every part level-" + level + " common-" + common._1 + " " + (System.currentTimeMillis() - time1))
       }
     }
 
@@ -136,20 +107,21 @@ object MinimalFDsMine {
   }
 
   private def getBottomFDs(df: DataFrame,
-                           colSize: Int): (Array[(Int, Int)], List[(Int, Int)]) = {
+                           colSize: Int
+                          ): (Array[((Int, Int), Int)], List[(Int, Int)]) = {
     val lhs = getSingleLhsCount(df, colSize)
     val whole = getTwoAttributesCount(df, colSize)
     val map = whole.groupBy(_._2).map(x => (x._1, x._2.map(_._1)))
-    val res = mutable.ListBuffer.empty[(Int, (Int, Int))]
+    val res = mutable.ListBuffer.empty[(Int, (Int, Int), Int)]
 
     lhs.foreach{x =>
       map.get(x._2) match {
         case Some(sets) =>
-          sets.filter(t => t._1 == x._1 || t._2 == x._1).foreach(t => res.append((x._1, t)))
+          sets.filter(t => t._1 == x._1 || t._2 == x._1).foreach(t => res.append((x._1, t, x._2)))
         case None => None
       }
     }
-    val fds = res.toArray.map(x => if (x._1 == x._2._1) (x._1, x._2._2) else (x._1, x._2._1))
+    val fds = res.toArray.map(x => if (x._1 == x._2._1) ((x._1, x._2._2), x._3) else ((x._1, x._2._1), x._3))
 
     (fds, lhs)
   }
@@ -175,15 +147,15 @@ object MinimalFDsMine {
     res
   }
 
-  def getEqualAttr(fds: Array[(Int, Int)]): (List[Set[Int]], Array[(Int, Int)]) = {
+  def getEqualAttr(fds: Array[((Int, Int), Int)]): (List[Set[Int]], Array[((Int, Int), Int)]) = {
     val len = fds.length
     val tmp = mutable.HashSet.empty[(Int, Int)]
 
     for (i <- 0 until (len - 1))
       for (j <- i + 1 until len)
-        if (fds(i) == fds(j).swap)
-          tmp.add(fds(i))
-    val newFds = fds.filter(x => !tmp.contains(x) && !tmp.contains(x.swap))
+        if (fds(i)._1 == fds(j)._1.swap)
+          tmp.add(fds(i)._1)
+    val newFds = fds.filter(x => !tmp.contains(x._1) && !tmp.contains(x._1.swap))
 
     val res = mutable.ListBuffer.empty[Set[Int]]
     val sets = tmp.map(fd => Set[Int](fd._1, fd._2))
@@ -235,15 +207,20 @@ object MinimalFDsMine {
     (equalAttrMap.toMap, ordersMap.toMap, orders, del.toList.sorted)
   }
 
-  def getNewBottomFDs(singleFDs: Array[(Int, Int)],
+  def getNewBottomFDs(singleFDs: Array[((Int, Int), Int)],
                       ordersMap: Map[Int, Int],
-                      equalAttrMap: Map[Int, List[Int]]): Array[(Set[Int], Int)] = {
+                      equalAttrMap: Map[Int, List[Int]]
+                     ): (Array[(Set[Int], Int)], Map[Set[Int], Int]) = {
     val equalAttrs = equalAttrMap.values.flatMap(_.toSet).toSet
     val swappedMap = ordersMap.map(x => (x._2, x._1))
-    val fds = singleFDs.filter(x => !equalAttrs.contains(x._1) && !equalAttrs.contains(x._2))
-      .map(x => (Set[Int](swappedMap(x._1)), swappedMap(x._2)))
+    val fds = singleFDs.filter(x => !equalAttrs.contains(x._1._1) && !equalAttrs.contains(x._1._2))
+      .map(x => (
+        (Set[Int](swappedMap(x._1._1)), swappedMap(x._1._2)),
+        (Set[Int](swappedMap(x._1._1), swappedMap(x._1._2)), x._2)
+        )
+      )
 
-    fds
+    (fds.map(_._1), fds.map(_._2).toMap)
   }
 
   def getLongestLhs(colSize: Int): mutable.Set[(Set[Int], Int)] = {
