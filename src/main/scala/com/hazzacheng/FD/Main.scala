@@ -19,7 +19,7 @@ object Main {
     val sc = ss.sparkContext
     val input = args(0)
     val output = args(1)
-    val df = FDsUtils.getDataFrameFromCSV(ss, input).persist(StorageLevel.MEMORY_AND_DISK_SER)
+    val df = FDsUtils.getDataFrameFromCSV(ss, input)//.persist(StorageLevel.MEMORY_AND_DISK_SER)
     val colSize = FDsUtils.getColSize(df)
     val fds = FDsMine_test.findOnSpark(sc, df, colSize, input)
     val res = FDsUtils.outPutFormat(fds)

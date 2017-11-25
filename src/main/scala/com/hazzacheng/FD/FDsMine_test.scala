@@ -28,6 +28,7 @@ object FDsMine_test {
                   df: DataFrame,
                   colSize: Int,
                   filePath: String): Map[Set[Int], List[Int]] = {
+    df.persist(StorageLevel.MEMORY_AND_DISK_SER)
     val results = mutable.ListBuffer.empty[(Set[Int], Int)]
 
     // get fds with single lhs
