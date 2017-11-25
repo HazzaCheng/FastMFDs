@@ -284,8 +284,10 @@ object FDsMine_test {
                             ): (Array[(Set[Int], Int)], Set[(Set[Int], Int)], Array[(String, List[(Set[Int], Int)])]) = {
     val fdsBV = sc.broadcast(fds)
     val levelMapBV = sc.broadcast(levelMap)
-    val tuplesRDD = partitionsRDD.map(p => checkEachPartition(fdsBV, levelMapBV, p, colSize)).persist(StorageLevel.MEMORY_AND_DISK_SER)
-    val duplicatesRDD = tuplesRDD.flatMap(x => x._2).persist(StorageLevel.MEMORY_AND_DISK_SER)
+    val tuplesRDD = partitionsRDD.map(p => checkEachPartition(fdsBV, levelMapBV, p, colSize))
+      .persist(StorageLevel.MEMORY_AND_DISK_SER)
+    val duplicatesRDD = tuplesRDD.flatMap(x => x._2)
+      .persist(StorageLevel.MEMORY_AND_DISK_SER)
     val candidates = duplicatesRDD.map(x => (x, 1)).reduceByKey(_ + _).collect()
     // TODO: local vs parallel
     val minimalFDs = candidates.filter(_._2 == partitionSize).map(_._1)
