@@ -71,12 +71,21 @@ object MinimalFDsMine {
     // check the top levels
     if (topFDs.nonEmpty) {
       // TODO: get the minimal FDs from topFDs
-      results ++= topFDs
+      results ++= topFDs.filter(fd => IsMinFD(fd, results.toList))
     }
 
     // recover all fds
     val fds = recoverAllFDs(results.toList, equalAttrMap, ordersMap)
     fds
+  }
+
+  def IsMinFD(toCheckFD: (Set[Int], Int), minFDs: List[(Set[Int], Int)]): Boolean = {
+    val res = true
+    val fds = minFDs.filter(x => x._2 == toCheckFD._2)
+    for(fd <- fds){
+      if(CandidatesUtils.isSubSet(toCheckFD._1, fd._1))return false
+    }
+    res
   }
 
   private def findByDf(newDF: DataFrame,
@@ -143,7 +152,7 @@ object MinimalFDsMine {
 
     if (candidates.nonEmpty) {
       // create the RDD
-      val rdd = RddCheckUtils.readAsRdd(sc, filePath, del)
+      val rdd = RddUtils.readAsRdd(sc, filePath, del)
 
       // create the map which save cutted leaves from bottom to top
       val wholeCuttedMap = mutable.HashMap
@@ -164,7 +173,7 @@ object MinimalFDsMine {
       for (level <- (spiltLevel + 1) to middle) {
         for (common <- orders) {
           val partitionRDD = partitions(common._1 - 1)
-          RddCheckUtils.checkInLowLevel(sc, level, common._1, common._2, partitionRDD,
+          RddUtils.checkInLowLevel(sc, level, common._1, common._2, partitionRDD,
             candidates, newColSize, wholeCuttedMap, topFDs, results)
         }
 
@@ -172,7 +181,7 @@ object MinimalFDsMine {
         if (level != symmetrical) {
           for (common <- orders) {
             val partitionRDD = partitions(common._1 - 1)
-            RddCheckUtils.checkInHighLevel(sc, symmetrical, common._1, common._2, partitionRDD,
+            RddUtils.checkInHighLevel(sc, symmetrical, common._1, common._2, partitionRDD,
               candidates, newColSize, wholeCountMap, topFDs, results)
           }
         }
