@@ -55,8 +55,8 @@ object DataFrameCheckUtils {
   }
 
   def getBottomFDs(df: DataFrame,
-                           colSize: Int
-                          ): (Array[(Int, Int)], List[(Int, Int)], List[((Int, Int), Int)]) = {
+                   colSize: Int
+                  ): (Array[(Int, Int)], List[(Int, Int)], List[((Int, Int), Int)]) = {
     val lhs = getSingleLhsCount(df, colSize)
     val whole = getTwoAttributesCount(df, colSize)
     val map = whole.groupBy(_._2).map(x => (x._1, x._2.map(_._1)))
@@ -75,15 +75,15 @@ object DataFrameCheckUtils {
   }
 
   def getTopFDs(attrsCountMap: mutable.HashMap[Set[Int], Int],
-                        newDF: DataFrame,
-                        topCandidates: mutable.Set[(Set[Int], Int)]
-                       ): (mutable.Set[(Set[Int], Int)], Array[(Set[Int], Int)]) = {
-    val cols = newDF.columns
+                df: DataFrame,
+                topCandidates: mutable.Set[(Set[Int], Int)]
+               ): (mutable.Set[(Set[Int], Int)], Array[(Set[Int], Int)]) = {
+    val cols = df.columns
 
     val (topFDs, wrong) = topCandidates.partition{x =>
       val lhs = x._1.map(y => cols(y - 1)).toArray
-      val whole = newDF.groupBy(cols(x._2 - 1), lhs: _*).count().count()
-      val left = newDF.groupBy(lhs.last, lhs.init: _*).count().count()
+      val whole = df.groupBy(cols(x._2 - 1), lhs: _*).count().count()
+      val left = df.groupBy(lhs.last, lhs.init: _*).count().count()
 
       attrsCountMap.put(x._1, left.toInt)
       attrsCountMap.put(x._1 + x._2, whole.toInt)
@@ -94,22 +94,54 @@ object DataFrameCheckUtils {
     (topFDs, wrong.toArray)
   }
 
-  def getAttrsCount(df: DataFrame,
-                    attrs: Set[Int]) = {
+  def getAttrsCount(df: DataFrame, attrs: Set[Int]): Int = {
+    val cols = df.columns
+    val attrsCols = attrs.toArray.map(x => cols(x - 1))
+    val count = df.groupBy(attrsCols.last, attrsCols.init: _*).count().count()
 
+    count.toInt
   }
 
   def getMinimalFDs(df: DataFrame,
-                    toChecked: mutable.HashMap[Set[Int], Set[Int]],
-                    attrsCountMap: mutable.HashMap[Set[Int], Int]) = {
+                    toChecked: mutable.HashMap[Set[Int], mutable.Set[Int]],
+                    lessAttrsCountMap: mutable.HashMap[Set[Int], Int]
+                   ): Array[(Set[Int], Int)] = {
     val biggerMap = mutable.HashMap.empty[Set[Int], Int]
-    val fds = toChecked.flatMap(x => x._2.map((x._1, _))).toList
+    val fds = toChecked.flatMap(x => x._2.map((x._1, _))).toArray
 
-    fds.filter{fd =>
-
+    val minimalFDs = fds.filter{fd =>
+      val lhs = lessAttrsCountMap.getOrElseUpdate(fd._1, getAttrsCount(df, fd._1))
+      val whole = biggerMap.getOrElseUpdate(fd._1 + fd._2, getAttrsCount(df, fd._1 + fd._2))
+      lhs == whole
     }
 
+    lessAttrsCountMap.clear()
+    lessAttrsCountMap ++= biggerMap
 
+    minimalFDs
+  }
+
+  def getFailFDs(df: DataFrame,
+                 toChecked: mutable.HashMap[Set[Int], mutable.Set[Int]],
+                 moreAttrsCountMap: mutable.HashMap[Set[Int], Int],
+                 topFDs: mutable.Set[(Set[Int], Int)]
+                ): Array[(Set[Int], Int)] = {
+    val smallerMap = mutable.HashMap.empty[Set[Int], Int]
+    val fds = toChecked.flatMap(x => x._2.map((x._1, _))).toArray
+
+    val failFDs = fds.filter{fd =>
+      val lhs = smallerMap.getOrElseUpdate(fd._1, getAttrsCount(df, fd._1))
+      val whole = moreAttrsCountMap.getOrElseUpdate(fd._1 + fd._2, getAttrsCount(df, fd._1 + fd._2))
+      lhs != whole
+    }
+
+    val rightFDs = fds.toSet -- failFDs
+    topFDs ++= rightFDs
+
+    moreAttrsCountMap.clear()
+    moreAttrsCountMap ++= smallerMap
+
+    failFDs
   }
 
 

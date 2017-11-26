@@ -82,6 +82,7 @@ object CandidatesUtils {
 
   def cutInTopLevels(topLevels: mutable.Set[(Set[Int], Int)],
                      minimal: Array[(Set[Int], Int)]): Unit = {
+    if (topLevels.isEmpty || minimal.isEmpty) return
     minimal.foreach{x =>
       val del = topLevels.filter(y => isSubSet(y._1, x._1) && y._2 == x._2)
       del.foreach(topLevels.remove(_))
@@ -90,6 +91,7 @@ object CandidatesUtils {
 
   def cutFromDownToTop(candidates: mutable.HashMap[Set[Int], mutable.Set[Int]],
                        minimal: Array[(Set[Int], Int)]): Unit = {
+    if (minimal.isEmpty || candidates.isEmpty) return
     for (fd <- minimal) {
       val lend = fd._1.size
       val lhs = candidates.keys.filter(x => x.size > lend && isSubSet(x, fd._1)).toList
@@ -99,8 +101,9 @@ object CandidatesUtils {
 
 
   def cutFromTopToDown(candidates: mutable.HashMap[Set[Int], mutable.Set[Int]],
-                       topFDs: Array[(Set[Int], Int)]): Unit = {
-    for (fd <- topFDs) {
+                       failFDs: Array[(Set[Int], Int)]): Unit = {
+    if (candidates.isEmpty || failFDs.isEmpty) return
+    for (fd <- failFDs) {
       val lhs = candidates.keys.filter(x => isSubSet(fd._1, x)).toList
       cutInCandidates(candidates, lhs, fd._2)
     }

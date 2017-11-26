@@ -30,14 +30,15 @@ object MinimalFDsMine {
                   filePath: String): Map[Set[Int], List[Int]] = {
     df.persist(StorageLevel.MEMORY_AND_DISK_SER)
     val results = mutable.ListBuffer.empty[(Set[Int], Int)]
-    val attrsCountMap = mutable.HashMap.empty[Set[Int], Int]
+    val lessAttrsCountMap = mutable.HashMap.empty[Set[Int], Int]
+    val moreAttrsCountMap = mutable.HashMap.empty[Set[Int], Int]
 
     // get fds with single lhs
     val (singleFDs, singleLhsCount, twoAttrsCount) = DataFrameCheckUtils.getBottomFDs(df, colSize)
     // get equal attributes
     val (equalAttr, withoutEqualAttr) = getEqualAttr(singleFDs)
     // get new orders
-    val (equalAttrMap, ordersMap, orders, del) = createNewOrders(attrsCountMap, equalAttr, singleLhsCount, colSize, twoAttrsCount)
+    val (equalAttrMap, ordersMap, orders, del) = createNewOrders(lessAttrsCountMap, equalAttr, singleLhsCount, colSize, twoAttrsCount)
     val newColSize = orders.length
     // create the new single lhs fds
     val bottomFDs = getNewBottomFDs(withoutEqualAttr, ordersMap, equalAttrMap)
@@ -48,18 +49,19 @@ object MinimalFDsMine {
     // check the fds with the longest lhs
     val topCandidates = getLongestLhs(newColSize)
     CandidatesUtils.cutInTopLevels(topCandidates, bottomFDs)
-    val (topFDs, wrongTopFDs) = DataFrameCheckUtils.getTopFDs(attrsCountMap, newDF, topCandidates)
+    val (topFDs, wrongTopFDs) = DataFrameCheckUtils.getTopFDs(moreAttrsCountMap, newDF, topCandidates)
     // get all candidates FD without bottom level and top level
     val candidates = CandidatesUtils.removeTopAndBottom(CandidatesUtils.getCandidates(newColSize), newColSize)
     // cut from bottom level and top level
     CandidatesUtils.cutFromDownToTop(candidates, bottomFDs)
     CandidatesUtils.cutFromTopToDown(candidates, wrongTopFDs)
 
-    if (newColSize <= 10) {
-
-    } else {
-
-    }
+    // find the minimal fds in the middle levels
+    if (newColSize <= 10)
+      findByDf(newDF, newColSize, candidates, lessAttrsCountMap, moreAttrsCountMap, topFDs, results)
+    else
+      findByDfAndRdd(sc, newDF, filePath, del, newColSize, orders,
+        candidates, lessAttrsCountMap, moreAttrsCountMap, topFDs, results)
 
     // check empty lhs
     val emptyFD = mutable.ListBuffer.empty[Int]
@@ -67,7 +69,7 @@ object MinimalFDsMine {
     if (emptyFD.nonEmpty)
       emptyFD.toList.foreach(rhs => results.append((Set.empty[Int], rhs)))
 
-    // check the top level
+    // check the top levels
     if (topFDs.nonEmpty) {
       // TODO: get the minimal FDs from topFDs
       results ++= topFDs
@@ -78,7 +80,33 @@ object MinimalFDsMine {
     fds
   }
 
-  private def findByDf(): Unit = {
+  private def findByDf(newDF: DataFrame,
+                       newColSize: Int,
+                       candidates: mutable.HashMap[Set[Int], mutable.Set[Int]],
+                       lessAttrsCountMap: mutable.HashMap[Set[Int], Int],
+                       moreAttrsCountMap: mutable.HashMap[Set[Int], Int],
+                       topFDs: mutable.Set[(Set[Int], Int)],
+                       results: mutable.ListBuffer[(Set[Int], Int)]
+                      ): Unit = {
+    val middle = (newColSize + 1) / 2
+    for (level <- 2 to middle) {
+      val toCheckedLow = CandidatesUtils.getLevelCandidates(candidates, level)
+      if (toCheckedLow.nonEmpty) {
+        val minimalFds = DataFrameCheckUtils.getMinimalFDs(newDF, toCheckedLow, lessAttrsCountMap)
+        results ++= minimalFds
+        CandidatesUtils.cutFromDownToTop(candidates, minimalFds)
+        CandidatesUtils.cutInTopLevels(topFDs, minimalFds)
+      }
+
+      val symmetrical = newColSize - level
+      if (level != symmetrical) {
+        val toCheckedHigh = CandidatesUtils.getLevelCandidates(candidates, symmetrical)
+        if (toCheckedHigh.nonEmpty) {
+          val failFDs = DataFrameCheckUtils.getFailFDs(newDF, toCheckedHigh, moreAttrsCountMap, topFDs)
+          CandidatesUtils.cutFromTopToDown(candidates, failFDs)
+        }
+      }
+    }
 
   }
 
@@ -89,16 +117,29 @@ object MinimalFDsMine {
                              newColSize: Int,
                              orders: Array[(Int, Int)],
                              candidates: mutable.HashMap[Set[Int], mutable.Set[Int]],
-                             attrsCountMap: mutable.HashMap[Set[Int], Int],
+                             lessAttrsCountMap: mutable.HashMap[Set[Int], Int],
+                             moreAttrsCountMap: mutable.HashMap[Set[Int], Int],
                              topFDs: mutable.Set[(Set[Int], Int)],
                              results: mutable.ListBuffer[(Set[Int], Int)]
                             ): Unit = {
     val spiltLevel = 2
     for (level <- 2 to spiltLevel) {
-      val toChecked = CandidatesUtils.getLevelCandidates(candidates, level)
-      val MinimalFds
+      val toCheckedLow = CandidatesUtils.getLevelCandidates(candidates, level)
+      if (toCheckedLow.nonEmpty) {
+        val minimalFds = DataFrameCheckUtils.getMinimalFDs(newDF, toCheckedLow, lessAttrsCountMap)
+        results ++= minimalFds
+        CandidatesUtils.cutFromDownToTop(candidates, minimalFds)
+        CandidatesUtils.cutInTopLevels(topFDs, minimalFds)
+      }
 
-      val reverseLevel = newColSize - level
+      val symmetrical = newColSize - level
+      if (level != symmetrical) {
+        val toCheckedHigh = CandidatesUtils.getLevelCandidates(candidates, symmetrical)
+        if (toCheckedHigh.nonEmpty) {
+          val failFDs = DataFrameCheckUtils.getFailFDs(newDF, toCheckedHigh, moreAttrsCountMap, topFDs)
+          CandidatesUtils.cutFromTopToDown(candidates, failFDs)
+        }
+      }
     }
 
     if (candidates.nonEmpty) {
@@ -124,16 +165,16 @@ object MinimalFDsMine {
       for (level <- (spiltLevel + 1) to middle) {
         for (common <- orders) {
           val partitionRDD = partitions(common._1 - 1)
-          RddCheckUtils.checkInLowLevel(sc, level, common._1, common._2, partitionRDD, candidates,
-            newColSize, wholeCuttedMap, topFDs, results)
+          RddCheckUtils.checkInLowLevel(sc, level, common._1, common._2, partitionRDD,
+            candidates, newColSize, wholeCuttedMap, topFDs, results)
         }
 
-        val reverseLevel = newColSize - level
-        if (level != reverseLevel) {
+        val symmetrical= newColSize - level
+        if (level != symmetrical) {
           for (common <- orders) {
             val partitionRDD = partitions(common._1 - 1)
-            RddCheckUtils.checkInHighLevel(sc, level, common._1, common._2, partitionRDD, candidates,
-              newColSize, wholeCountMap, topFDs, results)
+            RddCheckUtils.checkInHighLevel(sc, symmetrical, common._1, common._2, partitionRDD,
+              candidates, newColSize, wholeCountMap, topFDs, results)
           }
         }
       }

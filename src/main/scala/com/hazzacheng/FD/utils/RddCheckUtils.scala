@@ -40,22 +40,21 @@ object RddCheckUtils {
                       results: mutable.ListBuffer[(Set[Int], Int)]
                      ): Unit = {
     val toChecked = CandidatesUtils.getTargetCandidates(candidates, common, level).toList
-    val levelMap = wholeCuttedMap(common)
 
     if (toChecked.nonEmpty) {
+      val levelMap = wholeCuttedMap(common)
+
       val (minimalFDs, failFDs, partWithFailFDs) =
         RddCheckUtils.getMinimalFDs(sc, partitionRDD, toChecked, results, partitionSize, newColSize, levelMap)
-      if (minimalFDs.nonEmpty) {
-        CandidatesUtils.cutFromDownToTop(candidates, minimalFDs)
-        if (topFDs.nonEmpty) CandidatesUtils.cutInTopLevels(topFDs, minimalFDs)
-      }
+      CandidatesUtils.cutFromDownToTop(candidates, minimalFDs)
+      CandidatesUtils.cutInTopLevels(topFDs, minimalFDs)
       if (failFDs.nonEmpty) {
         val cuttedFDsMap = CandidatesUtils.getCuttedFDsMap(candidates, failFDs)
         RddCheckUtils.updateLevelMap(cuttedFDsMap, partWithFailFDs, levelMap, level)
       }
-    }
 
-    wholeCuttedMap.update(common, levelMap)
+      wholeCuttedMap.update(common, levelMap)
+    }
   }
 
   def checkInHighLevel(sc: SparkContext,
@@ -70,13 +69,15 @@ object RddCheckUtils {
                        results: mutable.ListBuffer[(Set[Int], Int)]
                       ): Unit = {
     val toChecked = CandidatesUtils.getTargetCandidates(candidates, common, level).toList
-    val levelMap = wholeCountMap(common)
-    val failFDs = RddCheckUtils.getFailFDs(sc, partitionRDD, toChecked, newColSize, levelMap)
-    val rightFDs = toChecked.flatMap(x => x._2.map((x._1, _))).toSet -- failFDs
-    topFDs ++= rightFDs
-    if (failFDs.nonEmpty) CandidatesUtils.cutFromTopToDown(candidates, failFDs)
+    if (toChecked.nonEmpty) {
+      val levelMap = wholeCountMap(common)
+      val failFDs = RddCheckUtils.getFailFDs(sc, partitionRDD, toChecked, newColSize, levelMap)
+      val rightFDs = toChecked.flatMap(x => x._2.map((x._1, _))).toSet -- failFDs
+      topFDs ++= rightFDs
+      CandidatesUtils.cutFromTopToDown(candidates, failFDs)
 
-    wholeCountMap.update(common, levelMap)
+      wholeCountMap.update(common, levelMap)
+    }
   }
 
   def getMinimalFDs(sc: SparkContext,
@@ -191,7 +192,14 @@ object RddCheckUtils {
               lhs: Set[Int],
               rhs: mutable.Set[Int],
               colSize: Int): (List[(Set[Int], Int)], (Set[Int], Int)) = {
-    //　TODO: finish the function, is levelMap can be updated?
+    val (existRhs, nonExistRhs) = rhs.partition(r => levelMap.contains(lhs + r))
+    val lhsCount = partition.map(p => (takeAttrLHS(p, lhs), 1)).groupBy(_._1).size
+    val nonExistRhsCount = nonExistRhs.map(r => (r, partition.map(p => (takeAttrLHS(p, lhs + r), 1)).groupBy(_._1).size))
+    val existRhsCount = existRhs.map(x => (x, levelMap(lhs + x)))
+    val wrong = (nonExistRhsCount ++ existRhsCount).filter(r => r._2 != lhsCount).map(x => (lhs, x._1))
+    nonExistRhsCount.foreach(r => levelMap.put(lhs + r._1, r._2))
+
+    (wrong.toList, (lhs, lhsCount))
   }
 
   private def takeAttrLHS(arr: Array[String],
