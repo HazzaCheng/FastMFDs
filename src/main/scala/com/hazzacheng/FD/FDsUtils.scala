@@ -19,17 +19,7 @@ import scala.collection.mutable.ListBuffer
   */
 object FDsUtils {
 
-  def getDataFrameFromCSV(ss: SparkSession, filePath: String): DataFrame = {
-    val df = ss.read.csv(filePath)
 
-    df
-  }
-
-  def getColSize(df: DataFrame): Int = {
-    val colSize = df.first.length
-
-    colSize
-  }
 
 
   def getColSizeAndOreders(ss: SparkSession, filePath: String): (Int, Array[(Int, Long)]) = {

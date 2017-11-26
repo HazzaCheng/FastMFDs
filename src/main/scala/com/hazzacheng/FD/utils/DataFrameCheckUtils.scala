@@ -1,0 +1,100 @@
+package com.hazzacheng.FD.utils
+
+import org.apache.spark.sql.{DataFrame, SparkSession}
+
+import scala.collection.mutable
+
+/**
+  * Created with IntelliJ IDEA.
+  * Description: 
+  * User: HazzaCheng
+  * Contact: hazzacheng@gmail.com
+  * Date: 17-11-26 
+  * Time: 12:59 PM
+  */
+object DataFrameCheckUtils {
+
+  def getDataFrameFromCSV(ss: SparkSession, filePath: String): DataFrame = {
+    val df = ss.read.csv(filePath)
+
+    df
+  }
+
+  def getColSize(df: DataFrame): Int = {
+    val colSize = df.first.length
+
+    colSize
+  }
+
+  def getNewDF(filePath: String, df: DataFrame, del: Set[Int]): DataFrame = {
+    val cols = df.columns.zipWithIndex.filter(x => !del.contains(x._2 + 1)).map(_._1)
+    val newDF = df.select(cols.last, cols.init: _*)
+
+    newDF
+  }
+
+  private def getSingleLhsCount(df: DataFrame, colSize: Int): List[(Int, Int)] = {
+    val res = df.columns.map(col => df.groupBy(col).count().count())
+      .zipWithIndex.map(x => (x._2 + 1, x._1.toInt))
+
+    res.toList
+  }
+
+  def getTwoAttributesCount(df: DataFrame, colSize: Int): List[((Int, Int), Int)] = {
+    val columns = df.columns
+    val tuples = mutable.ListBuffer.empty[((Int, Int), (String, String))]
+
+    for (i <- 0 until (colSize - 1))
+      for (j <- (i + 1) until colSize)
+        tuples.append(((i + 1, j + 1), (columns(i), columns(j))))
+
+    val res = tuples.toList.map(x =>
+      (x._1, df.groupBy(x._2._1, x._2._2).count().count().toInt))
+
+    res
+  }
+
+  def getBottomFDs(df: DataFrame,
+                           colSize: Int
+                          ): (Array[(Int, Int)], List[(Int, Int)], List[((Int, Int), Int)]) = {
+    val lhs = getSingleLhsCount(df, colSize)
+    val whole = getTwoAttributesCount(df, colSize)
+    val map = whole.groupBy(_._2).map(x => (x._1, x._2.map(_._1)))
+    val res = mutable.ListBuffer.empty[(Int, (Int, Int))]
+
+    lhs.foreach{x =>
+      map.get(x._2) match {
+        case Some(sets) =>
+          sets.filter(t => t._1 == x._1 || t._2 == x._1).foreach(t => res.append((x._1, t)))
+        case None => None
+      }
+    }
+    val fds = res.toArray.map(x => if (x._1 == x._2._1) (x._1, x._2._2) else (x._1, x._2._1))
+
+    (fds, lhs, whole)
+  }
+
+  def getTopFDs(attrsCountMap: mutable.HashMap[Set[Int], Int],
+                        newDF: DataFrame,
+                        topCandidates: mutable.Set[(Set[Int], Int)]
+                       ): (mutable.Set[(Set[Int], Int)], Array[(Set[Int], Int)]) = {
+    val cols = newDF.columns
+
+    val (topFDs, wrong) = topCandidates.partition{x =>
+      val lhs = x._1.map(y => cols(y - 1)).toArray
+      val whole = newDF.groupBy(cols(x._2 - 1), lhs: _*).count().count()
+      val left = newDF.groupBy(lhs.last, lhs.init: _*).count().count()
+
+      attrsCountMap.put(x._1, left.toInt)
+      attrsCountMap.put(x._1 + x._2, whole.toInt)
+
+      whole == left
+    }
+
+    (topFDs, wrong.toArray)
+  }
+
+
+
+
+}
