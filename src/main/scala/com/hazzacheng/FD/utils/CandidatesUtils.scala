@@ -180,7 +180,6 @@ object CandidatesUtils {
 
     for (fd <- sortedFDs) {
       if (topFDs contains fd) {
-        topFDs.remove(fd)
         val len = fd._1.size
         topFDs.toList.filter(x => x._1.size > len && x._2 == fd._2).foreach{x =>
           if (CandidatesUtils.isSubSet(x._1, fd._1)) topFDs.remove(x)
