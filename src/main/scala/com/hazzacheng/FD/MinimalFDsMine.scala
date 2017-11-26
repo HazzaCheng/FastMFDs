@@ -70,22 +70,13 @@ object MinimalFDsMine {
 
     // check the top levels
     if (topFDs.nonEmpty) {
-      // TODO: get the minimal FDs from topFDs
-      results ++= topFDs.filter(fd => IsMinFD(fd, results.toList))
+      CandidatesUtils.findMinFD(topFDs)
+      results ++= topFDs
     }
 
     // recover all fds
     val fds = recoverAllFDs(results.toList, equalAttrMap, ordersMap)
     fds
-  }
-
-  def IsMinFD(toCheckFD: (Set[Int], Int), minFDs: List[(Set[Int], Int)]): Boolean = {
-    val res = true
-    val fds = minFDs.filter(x => x._2 == toCheckFD._2)
-    for(fd <- fds){
-      if(CandidatesUtils.isSubSet(toCheckFD._1, fd._1))return false
-    }
-    res
   }
 
   private def findByDf(newDF: DataFrame,
