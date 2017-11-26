@@ -1,15 +1,13 @@
 package com.hazzacheng.FD
 
+import com.hazzacheng.FD.temp.FDsUtils
+import com.hazzacheng.FD.utils._
 import org.apache.spark.SparkContext
-import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.storage.StorageLevel
 
 import scala.collection.mutable
-import scala.collection.mutable.ListBuffer
-
-import utils._
 
 /**
   * Created with IntelliJ IDEA.
@@ -49,7 +47,7 @@ object MinimalFDsMine {
     df.unpersist()
     // check the fds with the longest lhs
     val topCandidates = getLongestLhs(newColSize)
-    CandidatesUtils.cutInTopLevel(topCandidates, bottomFDs)
+    CandidatesUtils.cutInTopLevels(topCandidates, bottomFDs)
     val (topFDs, wrongTopFDs) = DataFrameCheckUtils.getTopFDs(attrsCountMap, newDF, topCandidates)
     // get all candidates FD without bottom level and top level
     val candidates = CandidatesUtils.removeTopAndBottom(CandidatesUtils.getCandidates(newColSize), newColSize)
@@ -122,183 +120,172 @@ object MinimalFDsMine {
       val middle = (newColSize + 1) / 2
       for (level <- (spiltLevel + 1) to middle) {
         for (common <- orders) {
-          val partitionSize = common._2
           val partitionRDD = partitions(common._1 - 1)
-          val toChecked = CandidatesUtils.getTargetCandidates(candidates, common._1, level).toList
-          val levelMap = wholeCuttedMap(common._1)
-
-          if (toChecked.nonEmpty) {
-            val (minimalFDs, failFDs, partWithFailFDs) =
-              RddCheckUtils.getMinimalFDs(sc, partitionRDD, toChecked, results, partitionSize, newColSize, levelMap)
-            if (minimalFDs.nonEmpty) {
-              CandidatesUtils.cutFromDownToTop(candidates, minimalFDs)
-              if (topFDs.nonEmpty) CandidatesUtils.cutInTopLevels(topFDs, minimalFDs)
-            }
-            if (failFDs.nonEmpty) {
-              val cuttedFDsMap = CandidatesUtils.getCuttedFDsMap(candidates, failFDs)
-              RddCheckUtils.updateLevelMap(cuttedFDsMap, partWithFailFDs, levelMap, level)
-            }
-          }
-
-          wholeCuttedMap.update(common._1, levelMap)
+          RddCheckUtils.checkInLowLevel(sc, level, common._1, common._2, partitionRDD, candidates,
+            newColSize, wholeCuttedMap, topFDs, results)
         }
 
         val reverseLevel = newColSize - level + 1
         if (level != reverseLevel) {
           for (common <- orders) {
-            val partitionSize = common._2
             val partitionRDD = partitions(common._1 - 1)
-            val toChecked = CandidatesUtils.getTargetCandidates(candidates, common._1, reverseLevel).toList
-            val levelMap = wholeCountMap(common._1)
-            val failFDs = RddCheckUtils.getFailFDs(sc, partitionRDD, toChecked, newColSize, levelMap)
-            val rightFDs = toChecked.flatMap(x => x._2.map((x._1, _))).toSet -- failFDs
-            topFDs ++= rightFDs
-            if (failFDs.nonEmpty) CandidatesUtils.cutFromTopToDown(candidates, failFDs)
-
-            wholeCountMap.update(common._1, levelMap)
+            RddCheckUtils.checkInHighLevel(sc, level, common._1, common._2, partitionRDD, candidates,
+              newColSize, wholeCountMap, topFDs, results)
           }
         }
       }
+
     }
 
-    def getEqualAttr(fds: Array[(Int, Int)]): (List[Set[Int]], Array[(Int, Int)]) = {
-      val len = fds.length
-      val tmp = mutable.HashSet.empty[(Int, Int)]
+  }
 
-      for (i <- 0 until (len - 1))
-        for (j <- i + 1 until len)
-          if (fds(i) == fds(j).swap)
-            tmp.add(fds(i))
-      val newFds = fds.filter(x => !tmp.contains(x) && !tmp.contains(x.swap))
+  def getEqualAttr(fds: Array[(Int, Int)]): (List[Set[Int]], Array[(Int, Int)]) = {
+    val len = fds.length
+    val tmp = mutable.HashSet.empty[(Int, Int)]
 
-      val res = mutable.ListBuffer.empty[Set[Int]]
-      val sets = tmp.map(fd => Set[Int](fd._1, fd._2))
-      var setsArr = sets.toArray
-      while (setsArr.nonEmpty) {
-        var set = setsArr.last
-        sets.remove(set)
-        setsArr.init.foreach { x =>
-          if ((set & x).nonEmpty) {
-            set = (set | x)
-            sets.remove(x)
-          }
+    for (i <- 0 until (len - 1))
+      for (j <- i + 1 until len)
+        if (fds(i) == fds(j).swap)
+          tmp.add(fds(i))
+    val newFds = fds.filter(x => !tmp.contains(x) && !tmp.contains(x.swap))
+
+    val res = mutable.ListBuffer.empty[Set[Int]]
+    val sets = tmp.map(fd => Set[Int](fd._1, fd._2))
+    var setsArr = sets.toArray
+    while (setsArr.nonEmpty) {
+      var set = setsArr.last
+      sets.remove(set)
+      setsArr.init.foreach { x =>
+        if ((set & x).nonEmpty) {
+          set = (set | x)
+          sets.remove(x)
         }
-        res.append(set)
-        setsArr = sets.toArray
       }
-
-
-      (res.toList, newFds)
+      res.append(set)
+      setsArr = sets.toArray
     }
 
 
-    def createNewOrders(attrsCountMap: mutable.HashMap[Set[Int], Int],
-                        equalAttr: List[Set[Int]],
-                        singleLhsCount: List[(Int, Int)],
-                        colSize: Int,
-                        twoAttrsCount: List[((Int, Int), Int)]
-                       ): (Map[Int, List[Int]], Map[Int, Int], Array[(Int, Int)], List[Int]) = {
-      val maps = singleLhsCount.toMap
-      val equalAttrMap = mutable.Map.empty[Int, List[Int]]
-      val ordersMap = mutable.Map.empty[Int, Int]
-      val tmp = mutable.Set.empty[Int]
-      val del = mutable.ListBuffer.empty[Int]
-      Range(1, colSize + 1).foreach(tmp.add(_))
+    (res.toList, newFds)
+  }
 
-      equalAttr.foreach { x =>
-        val maxAttr = x.maxBy(y => maps(y))
-        val smallAttr = x.filter(_ != maxAttr).toList
-        del ++= smallAttr
-        tmp --= smallAttr
-        equalAttrMap.put(maxAttr, smallAttr)
-      }
 
-      var count = 1
-      for (i <- tmp.toList.sorted) {
-        ordersMap.put(count, i)
-        count += 1
-      }
+  def createNewOrders(attrsCountMap: mutable.HashMap[Set[Int], Int],
+                      equalAttr: List[Set[Int]],
+                      singleLhsCount: List[(Int, Int)],
+                      colSize: Int,
+                      twoAttrsCount: List[((Int, Int), Int)]
+                     ): (Map[Int, List[Int]], Map[Int, Int], Array[(Int, Int)], List[Int]) = {
+    val maps = singleLhsCount.toMap
+    val equalAttrMap = mutable.Map.empty[Int, List[Int]]
+    val ordersMap = mutable.Map.empty[Int, Int]
+    val tmp = mutable.Set.empty[Int]
+    val del = mutable.ListBuffer.empty[Int]
+    Range(1, colSize + 1).foreach(tmp.add(_))
 
-      val orders = ordersMap.toArray.map(x => (x._1, maps(x._2)))
-        .sortWith((x, y) => x._2 > y._2)
-
-      val delSet = del.toSet
-      val swappedOrdersMap = ordersMap.map(x => (x._2, x._1))
-      twoAttrsCount.map(x => (Set[Int](x._1._1, x._1._2), x._2))
-        .filter(x => (x._1 & delSet).isEmpty)
-        .foreach(x => attrsCountMap.put(x._1.map(ordersMap(_)), x._2))
-
-      (equalAttrMap.toMap, ordersMap.toMap, orders, del.toList.sorted)
+    equalAttr.foreach { x =>
+      val maxAttr = x.maxBy(y => maps(y))
+      val smallAttr = x.filter(_ != maxAttr).toList
+      del ++= smallAttr
+      tmp --= smallAttr
+      equalAttrMap.put(maxAttr, smallAttr)
     }
 
-    def getNewBottomFDs(singleFDs: Array[(Int, Int)],
-                        ordersMap: Map[Int, Int],
-                        equalAttrMap: Map[Int, List[Int]]): Array[(Set[Int], Int)] = {
-      val equalAttrs = equalAttrMap.values.flatMap(_.toSet).toSet
-      val swappedMap = ordersMap.map(x => (x._2, x._1))
-      val fds = singleFDs.filter(x => !equalAttrs.contains(x._1) && !equalAttrs.contains(x._2))
-        .map(x => (Set[Int](swappedMap(x._1)), swappedMap(x._2)))
-
-      fds
+    var count = 1
+    for (i <- tmp.toList.sorted) {
+      ordersMap.put(count, i)
+      count += 1
     }
 
-    def getLongestLhs(colSize: Int): mutable.Set[(Set[Int], Int)] = {
-      val res = mutable.Set.empty[(Set[Int], Int)]
-      val range = Range(1, colSize + 1)
+    val orders = ordersMap.toArray.map(x => (x._1, maps(x._2)))
+      .sortWith((x, y) => x._2 > y._2)
 
-      for (i <- 1 to colSize)
-        res.add(range.filter(_ != i).toSet, i)
+    val delSet = del.toSet
+    val swappedOrdersMap = ordersMap.map(x => (x._2, x._1))
+    twoAttrsCount.map(x => (Set[Int](x._1._1, x._1._2), x._2))
+      .filter(x => (x._1 & delSet).isEmpty)
+      .foreach(x => attrsCountMap.put(x._1.map(ordersMap(_)), x._2))
 
-      res
+    (equalAttrMap.toMap, ordersMap.toMap, orders, del.toList.sorted)
+  }
+
+  def getNewBottomFDs(singleFDs: Array[(Int, Int)],
+                      ordersMap: Map[Int, Int],
+                      equalAttrMap: Map[Int, List[Int]]): Array[(Set[Int], Int)] = {
+    val equalAttrs = equalAttrMap.values.flatMap(_.toSet).toSet
+    val swappedMap = ordersMap.map(x => (x._2, x._1))
+    val fds = singleFDs.filter(x => !equalAttrs.contains(x._1) && !equalAttrs.contains(x._2))
+      .map(x => (Set[Int](swappedMap(x._1)), swappedMap(x._2)))
+
+    fds
+  }
+
+  def getLongestLhs(colSize: Int): mutable.Set[(Set[Int], Int)] = {
+    val res = mutable.Set.empty[(Set[Int], Int)]
+    val range = Range(1, colSize + 1)
+
+    for (i <- 1 to colSize)
+      res.add(range.filter(_ != i).toSet, i)
+
+    res
+  }
+
+  private def repart(sc: SparkContext,
+                     rdd: RDD[Array[String]],
+                     attribute: Int): RDD[(String, List[Array[String]])] = {
+    val partitions = rdd.map(line => (line(attribute - 1), List(line)))
+      .reduceByKey(_ ++ _)
+
+    partitions
+  }
+
+  def recoverAllFDs(results: List[(Set[Int], Int)],
+                    equalAttrMap: Map[Int, List[Int]],
+                    ordersMap: Map[Int, Int]): Map[Set[Int], List[Int]] = {
+    val fds = mutable.ListBuffer.empty[(Set[Int], Int)]
+
+    val tmp = results.map { x =>
+      val lhs = x._1.map(ordersMap(_))
+      val rhs = ordersMap(x._2)
+      (lhs, rhs)
     }
 
-    def recoverAllFDs(results: List[(Set[Int], Int)],
-                      equalAttrMap: Map[Int, List[Int]],
-                      ordersMap: Map[Int, Int]): Map[Set[Int], List[Int]] = {
-      val fds = mutable.ListBuffer.empty[(Set[Int], Int)]
+    val equalAttrs = equalAttrMap.keySet
 
-      val tmp = results.map { x =>
-        val lhs = x._1.map(ordersMap(_))
-        val rhs = ordersMap(x._2)
-        (lhs, rhs)
-      }
-
-      val equalAttrs = equalAttrMap.keySet
-
-      for (fd <- tmp) {
-        val list = mutable.ListBuffer.empty[mutable.ListBuffer[Int]]
-        list.append(mutable.ListBuffer.empty[Int])
-        for (attr <- fd._1) {
-          if (equalAttrs contains attr) {
-            val temp = list.toList.map(_.clone())
-            list.foreach(_.append(attr))
-            for (ll <- temp) {
-              val add = equalAttrMap(attr).map { x =>
-                val clone = ll.clone()
-                clone.append(x)
-                clone
-              }
-              list ++= add
+    for (fd <- tmp) {
+      val list = mutable.ListBuffer.empty[mutable.ListBuffer[Int]]
+      list.append(mutable.ListBuffer.empty[Int])
+      for (attr <- fd._1) {
+        if (equalAttrs contains attr) {
+          val temp = list.toList.map(_.clone())
+          list.foreach(_.append(attr))
+          for (ll <- temp) {
+            val add = equalAttrMap(attr).map { x =>
+              val clone = ll.clone()
+              clone.append(x)
+              clone
             }
-          } else list.foreach(_.append(attr))
-        }
-        fds ++= list.map(x => (x.toSet, fd._2))
-      }
-
-      for (fd <- fds.toList)
-        if (equalAttrs contains fd._2)
-          equalAttrMap(fd._2).foreach(x => fds.append((fd._1, x)))
-
-      val equalClass = equalAttrMap.toList.map(x => x._1 :: x._2)
-      equalClass.foreach { ec =>
-        ec.foreach { x =>
-          ec.foreach { y =>
-            if (x != y) fds.append((Set[Int](x), y))
+            list ++= add
           }
+        } else list.foreach(_.append(attr))
+      }
+      fds ++= list.map(x => (x.toSet, fd._2))
+    }
+
+    for (fd <- fds.toList)
+      if (equalAttrs contains fd._2)
+        equalAttrMap(fd._2).foreach(x => fds.append((fd._1, x)))
+
+    val equalClass = equalAttrMap.toList.map(x => x._1 :: x._2)
+    equalClass.foreach { ec =>
+      ec.foreach { x =>
+        ec.foreach { y =>
+          if (x != y) fds.append((Set[Int](x), y))
         }
       }
-
-      fds.toList.groupBy(_._1).map(x => (x._1, x._2.map(_._2)))
     }
+
+    fds.toList.groupBy(_._1).map(x => (x._1, x._2.map(_._2)))
+  }
 
 }

@@ -1,6 +1,6 @@
 package com.hazzacheng.FD
 
-import com.hazzacheng.FD.FDsMine._
+import com.hazzacheng.FD.temp.FDsMine._
 import org.junit.runner.RunWith
 import org.scalatest.FunSuite
 import org.scalatest.junit.JUnitRunner
