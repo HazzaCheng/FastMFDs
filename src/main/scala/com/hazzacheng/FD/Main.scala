@@ -1,8 +1,7 @@
 package com.hazzacheng.FD
 
-import com.hazzacheng.FD.temp.{FDsMine_test, FDsUtils}
+import com.hazzacheng.FD.utils.RddUtils
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.storage.StorageLevel
 
 /**
   * Created with IntelliJ IDEA.
@@ -20,10 +19,10 @@ object Main {
     val sc = ss.sparkContext
     val input = args(0)
     val output = args(1)
-    val df = utils.DataFrameCheckUtils.getDataFrameFromCSV(ss, input)
-    val colSize = utils.DataFrameCheckUtils.getColSize(df)
-    val fds = FDsMine_test.findOnSpark(sc, df, colSize, input)
-    val res = FDsUtils.outPutFormat(fds)
+    val df = utils.DataFrameUtils.getDataFrameFromCSV(ss, input)
+    val colSize = utils.DataFrameUtils.getColSize(df)
+    val fds = MinimalFDsMine.findOnSpark(sc, df, colSize, input)
+    val res = RddUtils.outPutFormat(fds)
 
     sc.parallelize(res).saveAsTextFile(output)
   }

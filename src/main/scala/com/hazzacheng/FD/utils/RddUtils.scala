@@ -15,7 +15,7 @@ import scala.collection.mutable
   * Date: 17-11-26 
   * Time: 12:58 PM
   */
-object RddCheckUtils {
+object RddUtils {
 
   def readAsRdd(sc: SparkContext,
                 filePath: String,
@@ -26,6 +26,11 @@ object RddCheckUtils {
       .persist(StorageLevel.MEMORY_AND_DISK_SER)
 
     rdd
+  }
+
+  def outPutFormat(minFD: Map[Set[Int], List[Int]]): List[String] = {
+    minFD.map(d => d._1.toList.sorted.map(x => "column" + x).mkString("[", ",", "]")
+      + ":" + d._2.sorted.map(x => "column" + x).mkString(",")).toList
   }
 
   def checkInLowLevel(sc: SparkContext,

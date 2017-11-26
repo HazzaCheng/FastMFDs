@@ -12,7 +12,7 @@ import scala.collection.mutable
   * Date: 17-11-26 
   * Time: 12:59 PM
   */
-object DataFrameCheckUtils {
+object DataFrameUtils {
 
   def getDataFrameFromCSV(ss: SparkSession, filePath: String): DataFrame = {
     val df = ss.read.csv(filePath)
