@@ -34,13 +34,22 @@ object MinimalFDsMine {
 
     // get fds with single lhs
     val (singleFDs, singleLhsCount, twoAttrsCount) = DataFrameUtils.getBottomFDs(df, colSize)
+    println("====singleFDs: " + singleFDs.toList.toString())
+    println("====singleLhsCount: " + singleLhsCount.toList.toString())
+    println("====twoAttrsCount: " + twoAttrsCount.toList.toString())
     // get equal attributes
     val (equalAttr, withoutEqualAttr) = getEqualAttr(singleFDs)
+    println("====equalAttr: " + equalAttr.toList.toString())
     // get new orders
     val (equalAttrMap, ordersMap, orders, del) = createNewOrders(lessAttrsCountMap, equalAttr, singleLhsCount, colSize, twoAttrsCount)
+    println("====equalAttrMap: " + equalAttrMap.toList.toString())
+    println("====ordersMap: " + ordersMap.toList.toString())
+    println("====orders: " + orders.toList.toString())
+    println("====del: " + del.toList.toString())
     val newColSize = orders.length
     // create the new single lhs fds
     val bottomFDs = getNewBottomFDs(withoutEqualAttr, ordersMap, equalAttrMap)
+    println("====bottomFDs: " + bottomFDs.toList.toString())
     results ++= bottomFDs
     // get new df
     val newDF = DataFrameUtils.getNewDF(filePath, df, del.toSet).persist(StorageLevel.MEMORY_AND_DISK_SER)
@@ -49,6 +58,7 @@ object MinimalFDsMine {
     val topCandidates = getLongestLhs(newColSize)
     CandidatesUtils.cutInTopLevels(topCandidates, bottomFDs)
     val (topFDs, wrongTopFDs) = DataFrameUtils.getTopFDs(moreAttrsCountMap, newDF, topCandidates)
+    println("====true topFDs: " + topFDs.toList.toString())
     // get all candidates FD without bottom level and top level
     val candidates = CandidatesUtils.removeTopAndBottom(CandidatesUtils.getCandidates(newColSize), newColSize)
     // cut from bottom level and top level
@@ -90,8 +100,10 @@ object MinimalFDsMine {
     val middle = (newColSize + 1) / 2
     for (level <- 2 to middle) {
       val toCheckedLow = CandidatesUtils.getLevelCandidates(candidates, level)
+      println("====toCheckedLow: " + "level- " + level + " " + toCheckedLow.toList.toString())
       if (toCheckedLow.nonEmpty) {
         val minimalFds = DataFrameUtils.getMinimalFDs(newDF, toCheckedLow, lessAttrsCountMap)
+        println("====minimalFDs: " + "level-" + level + " " + minimalFds.toList.toString())
         results ++= minimalFds
         CandidatesUtils.cutFromDownToTop(candidates, minimalFds)
         CandidatesUtils.cutInTopLevels(topFDs, minimalFds)
@@ -100,8 +112,10 @@ object MinimalFDsMine {
       val symmetrical = newColSize - level
       if (level != symmetrical) {
         val toCheckedHigh = CandidatesUtils.getLevelCandidates(candidates, symmetrical)
+        println("====toCheckedHigh: " + "level- " + symmetrical + " " + toCheckedHigh.toList.toString())
         if (toCheckedHigh.nonEmpty) {
           val failFDs = DataFrameUtils.getFailFDs(newDF, toCheckedHigh, moreAttrsCountMap, topFDs)
+          println("====failFDs: " + "level- " + symmetrical + " " + failFDs.toList.toString() )
           CandidatesUtils.cutFromTopToDown(candidates, failFDs)
         }
       }
@@ -242,12 +256,12 @@ object MinimalFDsMine {
 
     val orders = ordersMap.toArray.map(x => (x._1, maps(x._2)))
       .sortWith((x, y) => x._2 > y._2)
-
+    val reverseMap = ordersMap.map(x => (x._2, x._1))
     val delSet = del.toSet
     val swappedOrdersMap = ordersMap.map(x => (x._2, x._1))
     twoAttrsCount.map(x => (Set[Int](x._1._1, x._1._2), x._2))
       .filter(x => (x._1 & delSet).isEmpty)
-      .foreach(x => attrsCountMap.put(x._1.map(ordersMap(_)), x._2))
+      .foreach(x => attrsCountMap.put(x._1.map(reverseMap(_)), x._2))
 
     (equalAttrMap.toMap, ordersMap.toMap, orders, del.toList.sorted)
   }
