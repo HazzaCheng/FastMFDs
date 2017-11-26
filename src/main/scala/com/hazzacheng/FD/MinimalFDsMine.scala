@@ -95,12 +95,15 @@ object MinimalFDsMine {
                             ): Unit = {
     val spiltLevel = 2
     for (level <- 2 to spiltLevel) {
+      val toChecked = CandidatesUtils.getLevelCandidates(candidates, level)
+      val MinimalFds
 
+      val reverseLevel = newColSize - level
     }
 
     if (candidates.nonEmpty) {
       // create the RDD
-      val rdd = FDsUtils.readAsRdd(sc, filePath, del)
+      val rdd = RddCheckUtils.readAsRdd(sc, filePath, del)
 
       // create the map which save cutted leaves from bottom to top
       val wholeCuttedMap = mutable.HashMap
@@ -125,7 +128,7 @@ object MinimalFDsMine {
             newColSize, wholeCuttedMap, topFDs, results)
         }
 
-        val reverseLevel = newColSize - level + 1
+        val reverseLevel = newColSize - level
         if (level != reverseLevel) {
           for (common <- orders) {
             val partitionRDD = partitions(common._1 - 1)

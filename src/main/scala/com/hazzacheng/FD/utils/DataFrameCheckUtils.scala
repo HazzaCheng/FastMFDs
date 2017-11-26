@@ -94,6 +94,23 @@ object DataFrameCheckUtils {
     (topFDs, wrong.toArray)
   }
 
+  def getAttrsCount(df: DataFrame,
+                    attrs: Set[Int]) = {
+
+  }
+
+  def getMinimalFDs(df: DataFrame,
+                    toChecked: mutable.HashMap[Set[Int], Set[Int]],
+                    attrsCountMap: mutable.HashMap[Set[Int], Int]) = {
+    val biggerMap = mutable.HashMap.empty[Set[Int], Int]
+    val fds = toChecked.flatMap(x => x._2.map((x._1, _))).toList
+
+    fds.filter{fd =>
+
+    }
+
+
+  }
 
 
 

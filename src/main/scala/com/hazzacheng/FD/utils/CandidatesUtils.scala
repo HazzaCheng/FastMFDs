@@ -59,6 +59,20 @@ object CandidatesUtils {
     res
   }
 
+  def getLevelCandidates(candidates: mutable.HashMap[Set[Int], mutable.Set[Int]],
+                         level: Int): mutable.HashMap[Set[Int], mutable.Set[Int]] = {
+    val res = mutable.HashMap.empty[Set[Int], mutable.Set[Int]]
+
+    for (key <- candidates.keys) {
+      if (key.size == level) {
+        res.put(key, candidates(key))
+        candidates.remove(key)
+      }
+    }
+
+    res
+  }
+
   def removeTopAndBottom(candidates: mutable.HashMap[Set[Int], mutable.Set[Int]],
                          colSize: Int): mutable.HashMap[Set[Int], mutable.Set[Int]] = {
     val newCandidates = candidates.filter(x => x._1.size != colSize - 1 && x._1.size!= 1)

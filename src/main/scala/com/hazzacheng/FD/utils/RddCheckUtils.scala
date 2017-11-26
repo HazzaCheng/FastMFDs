@@ -17,6 +17,17 @@ import scala.collection.mutable
   */
 object RddCheckUtils {
 
+  def readAsRdd(sc: SparkContext,
+                filePath: String,
+                del: scala.List[Int]): RDD[Array[String]] = {
+    val rdd = sc.textFile(filePath, sc.defaultParallelism * 4)
+      .map(line => line.split(",")
+        .zipWithIndex.filter(x => !del.contains(x._2 + 1)).map(_._1))
+      .persist(StorageLevel.MEMORY_AND_DISK_SER)
+
+    rdd
+  }
+
   def checkInLowLevel(sc: SparkContext,
                       level: Int,
                       common: Int,
