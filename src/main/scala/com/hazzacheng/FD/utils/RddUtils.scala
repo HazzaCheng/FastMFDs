@@ -50,12 +50,12 @@ object RddUtils {
       val levelMap = wholeCuttedMap(common)
 
       val (minimalFDs, failFDs, partWithFailFDs) =
-        RddCheckUtils.getMinimalFDs(sc, partitionRDD, toChecked, results, partitionSize, newColSize, levelMap)
+        RddUtils.getMinimalFDs(sc, partitionRDD, toChecked, results, partitionSize, newColSize, levelMap)
       CandidatesUtils.cutFromDownToTop(candidates, minimalFDs)
       CandidatesUtils.cutInTopLevels(topFDs, minimalFDs)
       if (failFDs.nonEmpty) {
         val cuttedFDsMap = CandidatesUtils.getCuttedFDsMap(candidates, failFDs)
-        RddCheckUtils.updateLevelMap(cuttedFDsMap, partWithFailFDs, levelMap, level)
+        RddUtils.updateLevelMap(cuttedFDsMap, partWithFailFDs, levelMap, level)
       }
 
       wholeCuttedMap.update(common, levelMap)
@@ -76,7 +76,7 @@ object RddUtils {
     val toChecked = CandidatesUtils.getTargetCandidates(candidates, common, level).toList
     if (toChecked.nonEmpty) {
       val levelMap = wholeCountMap(common)
-      val failFDs = RddCheckUtils.getFailFDs(sc, partitionRDD, toChecked, newColSize, levelMap)
+      val failFDs = RddUtils.getFailFDs(sc, partitionRDD, toChecked, newColSize, levelMap)
       val rightFDs = toChecked.flatMap(x => x._2.map((x._1, _))).toSet -- failFDs
       topFDs ++= rightFDs
       CandidatesUtils.cutFromTopToDown(candidates, failFDs)

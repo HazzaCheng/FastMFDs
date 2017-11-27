@@ -107,7 +107,7 @@ object DataFrameUtils {
                     lessAttrsCountMap: mutable.HashMap[Set[Int], Int]
                    ): Array[(Set[Int], Int)] = {
     val biggerMap = mutable.HashMap.empty[Set[Int], Int]
-    val fds = toChecked.flatMap(x => x._2.map((x._1, _))).toArray
+    val fds = toChecked.toList.flatMap(x => x._2.map((x._1, _))).toArray
 
     val minimalFDs = fds.filter{fd =>
       val lhs = lessAttrsCountMap.getOrElseUpdate(fd._1, getAttrsCount(df, fd._1))
