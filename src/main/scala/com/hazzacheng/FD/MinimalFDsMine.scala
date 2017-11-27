@@ -256,12 +256,11 @@ object MinimalFDsMine {
 
     val orders = ordersMap.toArray.map(x => (x._1, maps(x._2)))
       .sortWith((x, y) => x._2 > y._2)
-    val reverseMap = ordersMap.map(x => (x._2, x._1))
     val delSet = del.toSet
     val swappedOrdersMap = ordersMap.map(x => (x._2, x._1))
     twoAttrsCount.map(x => (Set[Int](x._1._1, x._1._2), x._2))
       .filter(x => (x._1 & delSet).isEmpty)
-      .foreach(x => attrsCountMap.put(x._1.map(reverseMap(_)), x._2))
+      .foreach(x => attrsCountMap.put(x._1.map(swappedOrdersMap(_)), x._2))
 
     (equalAttrMap.toMap, ordersMap.toMap, orders, del.toList.sorted)
   }
