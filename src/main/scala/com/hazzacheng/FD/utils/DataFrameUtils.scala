@@ -28,7 +28,7 @@ object DataFrameUtils {
 
   def getNewDF(filePath: String, df: DataFrame, del: Set[Int]): DataFrame = {
     val cols = df.columns.zipWithIndex.filter(x => !del.contains(x._2 + 1)).map(_._1)
-    val newDF = df.select(cols.last, cols.init: _*)
+    val newDF = df.select(cols.head, cols.tail: _*)
 
     newDF
   }
@@ -83,7 +83,7 @@ object DataFrameUtils {
     val (topFDs, wrong) = topCandidates.partition{x =>
       val lhs = x._1.map(y => cols(y - 1)).toArray
       val whole = df.groupBy(cols(x._2 - 1), lhs: _*).count().count()
-      val left = df.groupBy(lhs.last, lhs.init: _*).count().count()
+      val left = df.groupBy(lhs.head, lhs.tail: _*).count().count()
 
       attrsCountMap.put(x._1, left.toInt)
       attrsCountMap.put(x._1 + x._2, whole.toInt)
@@ -97,7 +97,7 @@ object DataFrameUtils {
   def getAttrsCount(df: DataFrame, attrs: Set[Int]): Int = {
     val cols = df.columns
     val attrsCols = attrs.toArray.map(x => cols(x - 1))
-    val count = df.groupBy(attrsCols.last, attrsCols.init: _*).count().count()
+    val count = df.groupBy(attrsCols.head, attrsCols.tail: _*).count().count()
 
     count.toInt
   }
