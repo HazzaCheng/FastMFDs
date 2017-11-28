@@ -44,8 +44,9 @@ object RddUtils {
                       topFDs: mutable.Set[(Set[Int], Int)],
                       results: mutable.ListBuffer[(Set[Int], Int)]
                      ): Unit = {
+    val time0 = System.currentTimeMillis()
     val toChecked = CandidatesUtils.getTargetCandidates(candidates, common, level).toList
-
+    println("====toChecked: common: " + common + " level: " + level + " lhs: " + toChecked.length + " whole: " + toChecked.flatMap(x => x._2.toList).size)
     if (toChecked.nonEmpty) {
       val levelMap = wholeCuttedMap(common)
 
@@ -60,6 +61,7 @@ object RddUtils {
 
       wholeCuttedMap.update(common, levelMap)
     }
+    println("====time: common: " + common + " level: " + level + " " + (System.currentTimeMillis() - time0))
   }
 
   def checkInHighLevel(sc: SparkContext,
@@ -73,7 +75,9 @@ object RddUtils {
                        topFDs: mutable.Set[(Set[Int], Int)],
                        results: mutable.ListBuffer[(Set[Int], Int)]
                       ): Unit = {
+    val time0 = System.currentTimeMillis()
     val toChecked = CandidatesUtils.getTargetCandidates(candidates, common, level).toList
+    println("====toChecked: common: " + common + " level: " + level + " lhs: " + toChecked.length + " whole: " + toChecked.flatMap(x => x._2.toList).size)
     if (toChecked.nonEmpty) {
       val levelMap = wholeCountMap(common)
       val failFDs = RddUtils.getFailFDs(sc, partitionRDD, toChecked, newColSize, levelMap)
@@ -83,6 +87,7 @@ object RddUtils {
 
       wholeCountMap.update(common, levelMap)
     }
+    println("====time: common: " + common + " level: " + level + " " + (System.currentTimeMillis() - time0))
   }
 
   def getMinimalFDs(sc: SparkContext,

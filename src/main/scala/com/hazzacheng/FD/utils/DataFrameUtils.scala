@@ -96,9 +96,11 @@ object DataFrameUtils {
 
   def getAttrsCount(df: DataFrame, attrs: Set[Int]): Int = {
     val cols = df.columns
+    println("====attrs: " + attrs.toList.toString())
     val attrsCols = attrs.toArray.map(x => cols(x - 1))
+    println("====attrsCols: " + attrsCols.toList.toString())
     val count = df.groupBy(attrsCols.head, attrsCols.tail: _*).count().count()
-
+    println("====attrsCount: " + count)
     count.toInt
   }
 
@@ -108,10 +110,11 @@ object DataFrameUtils {
                    ): Array[(Set[Int], Int)] = {
     val biggerMap = mutable.HashMap.empty[Set[Int], Int]
     val fds = toChecked.toList.flatMap(x => x._2.map((x._1, _))).toArray
-
+    println("=====fd all: " + fds.length + " " + fds.toList.toString())
     val minimalFDs = fds.filter{fd =>
       val lhs = lessAttrsCountMap.getOrElseUpdate(fd._1, getAttrsCount(df, fd._1))
       val whole = biggerMap.getOrElseUpdate(fd._1 + fd._2, getAttrsCount(df, fd._1 + fd._2))
+      println("====fds: " + fd.toString() + " lhs" + lhs + " whole " + whole)
       lhs == whole
     }
 
