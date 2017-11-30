@@ -34,22 +34,22 @@ object MinimalFDsMine {
     time1 = System.currentTimeMillis()
     // get fds with single lhs
     val (singleFDs, singleLhsCount, twoAttrsCount) = DataFrameUtils.getBottomFDs(df, colSize)
-    println("====singleFDs: " + singleFDs.toList.toString())
-    println("====singleLhsCount: " + singleLhsCount.toString())
-    println("====twoAttrsCount: " + twoAttrsCount.toString())
+    //println("====singleFDs: " + singleFDs.toList.toString())
+    //println("====singleLhsCount: " + singleLhsCount.toString())
+    //println("====twoAttrsCount: " + twoAttrsCount.toString())
     // get equal attributes
     val (equalAttr, withoutEqualAttr) = getEqualAttr(singleFDs)
-    println("====equalAttr: " + equalAttr.toString())
+    //println("====equalAttr: " + equalAttr.toString())
     // get new orders
     val (equalAttrMap, ordersMap, orders, del) = createNewOrders(lessAttrsCountMap, equalAttr, singleLhsCount, colSize, twoAttrsCount)
-    println("====equalAttrMap: " + equalAttrMap.toList.toString())
-    println("====ordersMap: " + ordersMap.toList.toString())
-    println("====orders: " + orders.toList.toString())
-    println("====del: " + del.toString())
+    //println("====equalAttrMap: " + equalAttrMap.toList.toString())
+    //println("====ordersMap: " + ordersMap.toList.toString())
+    //println("====orders: " + orders.toList.toString())
+    //println("====del: " + del.toString())
     val newColSize = orders.length
     // create the new single lhs fds
     val bottomFDs = getNewBottomFDs(withoutEqualAttr, ordersMap, equalAttrMap)
-    println("====bottomFDs: " + bottomFDs.toList.toString())
+    //println("====bottomFDs: " + bottomFDs.toList.toString())
     results ++= bottomFDs
     // get new df
     val newDF = DataFrameUtils.getNewDF(filePath, df, del.toSet).persist(StorageLevel.MEMORY_AND_DISK_SER)
@@ -58,7 +58,7 @@ object MinimalFDsMine {
     val topCandidates = getLongestLhs(newColSize)
     CandidatesUtils.cutInTopLevels(topCandidates, bottomFDs)
     val (topFDs, wrongTopFDs) = DataFrameUtils.getTopFDs(moreAttrsCountMap, newDF, topCandidates)
-    println("====true topFDs: " + topFDs.toList.toString())
+    //println("====true topFDs: " + topFDs.toList.toString())
     // get all candidates FD without bottom level and top level
     val candidates = CandidatesUtils.removeTopAndBottom(CandidatesUtils.getCandidates(newColSize), newColSize)
     // cut from bottom level and top level
@@ -67,7 +67,7 @@ object MinimalFDsMine {
 
     // find the minimal fds in the middle levels
     if (newColSize <= 10)
-      findByDf(newDF, newColSize, candidates, lessAttrsCountMap, moreAttrsCountMap, topFDs, results)
+      findByDf(newDF, newColSize, candidates, lessAttrsCountMap, moreAttrsCountMap, topFDs, results, orders)
     else
       findByDfAndRdd(sc, newDF, filePath, del, newColSize, orders,
         candidates, lessAttrsCountMap, moreAttrsCountMap, topFDs, results)
@@ -95,7 +95,8 @@ object MinimalFDsMine {
                        lessAttrsCountMap: mutable.HashMap[Set[Int], Int],
                        moreAttrsCountMap: mutable.HashMap[Set[Int], Int],
                        topFDs: mutable.Set[(Set[Int], Int)],
-                       results: mutable.ListBuffer[(Set[Int], Int)]
+                       results: mutable.ListBuffer[(Set[Int], Int)],
+                       orders:  Array[(Int, Int)]
                       ): Unit = {
     val middle = (newColSize + 1) / 2
     for (level <- 2 to middle) {
@@ -104,18 +105,18 @@ object MinimalFDsMine {
       if (level != symmetrical) {
         val time0 = System.currentTimeMillis()
         val toCheckedHigh = CandidatesUtils.getLevelCandidates(candidates, symmetrical)
-        println("====toCheckedHigh: " + "level- " + symmetrical + " " + toCheckedHigh.toList.flatMap(x => x._2.toList).size)
+        println("====df toCheckedHigh: " + "level- " + symmetrical + " " + " lhs: " + toCheckedHigh.toList.length + " whole: " + toCheckedHigh.toList.flatMap(x => x._2.toList).size)
         if (toCheckedHigh.nonEmpty) {
           val failFDs = DataFrameUtils.getFailFDs(newDF, toCheckedHigh, moreAttrsCountMap, topFDs)
           println("====failFDs: " + "level- " + symmetrical + " " + failFDs.toList.toString() )
           CandidatesUtils.cutFromTopToDown(candidates, failFDs)
         }
-        println("====time: " + "level-" + level + " " + (System.currentTimeMillis() - time0))
+        println("====df time: " + "level-" + level + " " + (System.currentTimeMillis() - time0))
       }
 
       //the lower level
       val toCheckedLow = CandidatesUtils.getLevelCandidates(candidates, level)
-      println("====toCheckedLow: " + "level- " + level + " " + toCheckedLow.toList.flatMap(x => x._2.toList).size)
+      println("====df toCheckedLow: " + "level- " + level + " " + " lhs: " + toCheckedLow.toList.length + " whole: " + toCheckedLow.toList.flatMap(x => x._2.toList).size)
       if (toCheckedLow.nonEmpty) {
         val time0 = System.currentTimeMillis()
         val minimalFds = DataFrameUtils.getMinimalFDs(newDF, toCheckedLow, lessAttrsCountMap)
@@ -123,7 +124,7 @@ object MinimalFDsMine {
         results ++= minimalFds
         CandidatesUtils.cutFromDownToTop(candidates, minimalFds)
         CandidatesUtils.cutInTopLevels(topFDs, minimalFds)
-        println("====time: " + "level-" + level + " " + (System.currentTimeMillis() - time0))
+        println("====df time: " + "level-" + level + " " + (System.currentTimeMillis() - time0))
       }
     }
 
@@ -154,16 +155,22 @@ object MinimalFDsMine {
       // the higher level
       val symmetrical = newColSize - level
       if (level != symmetrical) {
+        val time0 = System.currentTimeMillis()
         val toCheckedHigh = CandidatesUtils.getLevelCandidates(candidates, symmetrical)
+        println("====toCheckedHigh: " + "level- " + symmetrical + " " + " lhs: " + toCheckedHigh.toList.length + " whole: " + toCheckedHigh.toList.flatMap(x => x._2.toList).size)
         if (toCheckedHigh.nonEmpty) {
           val failFDs = DataFrameUtils.getFailFDs(newDF, toCheckedHigh, moreAttrsCountMap, topFDs)
           CandidatesUtils.cutFromTopToDown(candidates, failFDs)
         }
+        println("====toCheckedHigh time: " + "level- " + symmetrical + " " + (System.currentTimeMillis() - time0))
       }
 
       // the lower level
+      val time_ = System.currentTimeMillis()
       val toCheckedCommon = CandidatesUtils.getTargetCandidates(candidates, commmonAttr, level).toList
+      println("====toCheckedLow: " + "level- " + level + " " + " common: " + commmonAttr + " lhs: " + toCheckedCommon.length + " whole: " + toCheckedCommon.flatMap(x => x._2.toList).size)
       val toCheckedLow = CandidatesUtils.getLevelCandidates(candidates, level)
+      println("====toCheckedLow: " + "level- " + level + " " + " lhs: " + toCheckedLow.toList.length + " whole: " + toCheckedLow.toList.flatMap(x => x._2.toList).size)
       if (toCheckedCommon.nonEmpty) {
         val (minimalFDs, failFDs, partWithFailFDs) =
           RddUtils.getMinimalFDs(sc, partitionRDD, toCheckedCommon, results, partitionSize, newColSize, wholeCuttedMap)
@@ -180,6 +187,7 @@ object MinimalFDsMine {
         CandidatesUtils.cutFromDownToTop(candidates, minimalFds)
         CandidatesUtils.cutInTopLevels(topFDs, minimalFds)
       }
+      println("====toCheckedLow time: " + "level- " + level + " " + (System.currentTimeMillis() - time_))
     }
 
   }
