@@ -1,6 +1,7 @@
 package com.hazzacheng.FD
 
 import com.hazzacheng.FD.utils.RddUtils
+import org.apache.spark.SparkConf
 import org.apache.spark.sql.SparkSession
 
 /**
@@ -15,7 +16,10 @@ import org.apache.spark.sql.SparkSession
 object Main {
 
   def main(args: Array[String]): Unit = {
-    val ss = SparkSession.builder().getOrCreate()
+    val conf = new SparkConf().set("spark.rdd.compress", "true")
+      .set("spark.speculation", "true")
+
+    val ss = SparkSession.builder().config(conf).getOrCreate()
     val sc = ss.sparkContext
     val input = args(0)
     val output = args(1)

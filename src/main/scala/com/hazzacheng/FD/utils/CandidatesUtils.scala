@@ -164,7 +164,6 @@ object CandidatesUtils {
                       failFDs: Set[(Set[Int], Int)]
                      ): mutable.HashMap[(Set[Int], Int), mutable.HashSet[(Set[Int], Int)]] = {
     val map = mutable.HashMap.empty[(Set[Int], Int), mutable.HashSet[(Set[Int], Int)]]
-    // TODO: set vs hashset
     failFDs.foreach{x =>
       val cutted = getCutted(candidates, x)
       if (cutted.nonEmpty) {

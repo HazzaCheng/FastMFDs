@@ -19,9 +19,6 @@ import scala.collection.mutable
   */
 
 object MinimalFDsMine {
-  private val parallelScaleFactor = 4
-  var time1 = System.currentTimeMillis()
-  var time2 = System.currentTimeMillis()
 
   def findOnSpark(sc: SparkContext,
                   df: DataFrame,
@@ -31,25 +28,15 @@ object MinimalFDsMine {
     val results = mutable.ListBuffer.empty[(Set[Int], Int)]
     val lessAttrsCountMap = mutable.HashMap.empty[Set[Int], Int]
     val moreAttrsCountMap = mutable.HashMap.empty[Set[Int], Int]
-    time1 = System.currentTimeMillis()
     // get fds with single lhs
     val (singleFDs, singleLhsCount, twoAttrsCount) = DataFrameUtils.getBottomFDs(df, colSize)
-    //println("====singleFDs: " + singleFDs.toList.toString())
-    //println("====singleLhsCount: " + singleLhsCount.toString())
-    //println("====twoAttrsCount: " + twoAttrsCount.toString())
     // get equal attributes
     val (equalAttr, withoutEqualAttr) = getEqualAttr(singleFDs)
-    //println("====equalAttr: " + equalAttr.toString())
     // get new orders
     val (equalAttrMap, ordersMap, orders, del) = createNewOrders(lessAttrsCountMap, equalAttr, singleLhsCount, colSize, twoAttrsCount)
-    //println("====equalAttrMap: " + equalAttrMap.toList.toString())
-    //println("====ordersMap: " + ordersMap.toList.toString())
-    //println("====orders: " + orders.toList.toString())
-    //println("====del: " + del.toString())
     val newColSize = orders.length
     // create the new single lhs fds
     val bottomFDs = getNewBottomFDs(withoutEqualAttr, ordersMap, equalAttrMap)
-    //println("====bottomFDs: " + bottomFDs.toList.toString())
     results ++= bottomFDs
     // get new df
     val newDF = DataFrameUtils.getNewDF(filePath, df, del.toSet).persist(StorageLevel.MEMORY_AND_DISK_SER)
@@ -58,7 +45,6 @@ object MinimalFDsMine {
     val topCandidates = getLongestLhs(newColSize)
     CandidatesUtils.cutInTopLevels(topCandidates, bottomFDs)
     val (topFDs, wrongTopFDs) = DataFrameUtils.getTopFDs(moreAttrsCountMap, newDF, topCandidates)
-    //println("====true topFDs: " + topFDs.toList.toString())
     // get all candidates FD without bottom level and top level
     val candidates = CandidatesUtils.removeTopAndBottom(CandidatesUtils.getCandidates(newColSize), newColSize)
     // cut from bottom level and top level
