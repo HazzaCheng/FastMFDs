@@ -85,7 +85,7 @@ object CandidatesUtils {
     if (topLevels.isEmpty || minimal.isEmpty) return
     minimal.foreach{x =>
       val del = topLevels.filter(y => isSubSet(y._1, x._1) && y._2 == x._2)
-      del.foreach(topLevels.remove(_))
+      del.foreach(topLevels.remove)
     }
   }
 
