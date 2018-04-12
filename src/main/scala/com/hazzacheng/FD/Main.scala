@@ -16,8 +16,11 @@ import org.apache.spark.sql.SparkSession
 object Main {
 
   def main(args: Array[String]): Unit = {
-    val conf = new SparkConf().set("spark.rdd.compress", "true")
+    val conf = new SparkConf()
+      .set("spark.default.parallelism", "500")
+      .set("spark.rdd.compress", "true")
       .set("spark.speculation", "true")
+      .set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
 
     val ss = SparkSession.builder().config(conf).getOrCreate()
     val sc = ss.sparkContext
@@ -30,6 +33,5 @@ object Main {
 
     sc.parallelize(res).saveAsTextFile(output)
   }
-
 
 }
