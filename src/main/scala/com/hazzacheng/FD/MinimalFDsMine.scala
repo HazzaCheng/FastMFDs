@@ -26,15 +26,18 @@ object MinimalFDsMine {
                   filePath: String): Map[Set[Int], List[Int]] = {
     df.persist(StorageLevel.MEMORY_AND_DISK_SER)
     val results = mutable.ListBuffer.empty[(Set[Int], Int)]
+    val allSame = mutable.HashSet.empty[Int]
     val lessAttrsCountMap = mutable.HashMap.empty[Set[Int], Int]
     val moreAttrsCountMap = mutable.HashMap.empty[Set[Int], Int]
     // get fds with single lhs
-    val (singleFDs, singleLhsCount, twoAttrsCount) = DataFrameUtils.getBottomFDs(df, colSize)
+    val (singleFDs, singleLhsCount, twoAttrsCount) = DataFrameUtils.getBottomFDs(df, colSize, allSame)
     // get equal attributes
     val (equalAttr, withoutEqualAttr) = getEqualAttr(singleFDs)
     // get new orders
-    val (equalAttrMap, ordersMap, orders, del) = createNewOrders(lessAttrsCountMap, equalAttr, singleLhsCount, colSize, twoAttrsCount)
+    val (equalAttrMap, ordersMap, orders, del) = createNewOrders(lessAttrsCountMap, equalAttr, singleLhsCount, colSize, twoAttrsCount, allSame)
     val newColSize = orders.length
+    println("====== Now Attrs Count: " + newColSize + " Cut: " + (colSize - newColSize))
+
     // create the new single lhs fds
     val bottomFDs = getNewBottomFDs(withoutEqualAttr, ordersMap, equalAttrMap)
     results ++= bottomFDs
@@ -58,11 +61,11 @@ object MinimalFDsMine {
       findByDfAndRdd(sc, newDF, filePath, del, newColSize, orders,
         candidates, lessAttrsCountMap, moreAttrsCountMap, topFDs, results)
 
-    // check empty lhs
+   /* // check empty lhs
     val emptyFD = mutable.ListBuffer.empty[Int]
     emptyFD ++= orders.filter(_._2.toInt == 1).map(_._1)
     if (emptyFD.nonEmpty)
-      emptyFD.toList.foreach(rhs => results.append((Set.empty[Int], rhs)))
+      emptyFD.toList.foreach(rhs => results.append((Set.empty[Int], rhs)))*/
 
     // check the top levels
     if (topFDs.nonEmpty) {
@@ -71,7 +74,7 @@ object MinimalFDsMine {
     }
 
     // recover all fds
-    val fds = recoverAllFDs(results.toList, equalAttrMap, ordersMap)
+    val fds = recoverAllFDs(results.toList, equalAttrMap, ordersMap, allSame)
     fds
   }
 
@@ -196,7 +199,7 @@ object MinimalFDsMine {
       sets.remove(set)
       setsArr.init.foreach { x =>
         if ((set & x).nonEmpty) {
-          set = (set | x)
+          set = set | x
           sets.remove(x)
         }
       }
@@ -213,7 +216,8 @@ object MinimalFDsMine {
                       equalAttr: List[Set[Int]],
                       singleLhsCount: List[(Int, Int)],
                       colSize: Int,
-                      twoAttrsCount: List[((Int, Int), Int)]
+                      twoAttrsCount: List[((Int, Int), Int)],
+                      allSame: mutable.HashSet[Int]
                      ): (Map[Int, List[Int]], Map[Int, Int], Array[(Int, Int)], List[Int]) = {
     val maps = singleLhsCount.toMap
     val equalAttrMap = mutable.Map.empty[Int, List[Int]]
@@ -221,6 +225,8 @@ object MinimalFDsMine {
     val tmp = mutable.Set.empty[Int]
     val del = mutable.ListBuffer.empty[Int]
     Range(1, colSize + 1).foreach(tmp.add(_))
+    tmp --= allSame
+    del ++= allSame
 
     equalAttr.foreach { x =>
       val maxAttr = x.maxBy(y => maps(y))
@@ -279,7 +285,9 @@ object MinimalFDsMine {
 
   def recoverAllFDs(results: List[(Set[Int], Int)],
                     equalAttrMap: Map[Int, List[Int]],
-                    ordersMap: Map[Int, Int]): Map[Set[Int], List[Int]] = {
+                    ordersMap: Map[Int, Int],
+                    allSame: mutable.HashSet[Int]
+                   ): Map[Set[Int], List[Int]] = {
     val fds = mutable.ListBuffer.empty[(Set[Int], Int)]
 
     val tmp = results.map { x =>
@@ -320,6 +328,13 @@ object MinimalFDsMine {
         ec.foreach { y =>
           if (x != y) fds.append((Set[Int](x), y))
         }
+      }
+    }
+
+    allSame.toArray.foreach { x =>
+      allSame.toArray.foreach { y =>
+          if (x == y) fds.append((Set.empty[Int], x))
+          else fds.append((Set[Int](x), y))
       }
     }
 

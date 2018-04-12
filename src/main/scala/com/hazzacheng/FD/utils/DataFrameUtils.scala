@@ -26,6 +26,10 @@ object DataFrameUtils {
     colSize
   }
 
+  def getRowSize(df: DataFrame): Long = {
+    df.count()
+  }
+
   def getNewDF(filePath: String, df: DataFrame, del: Set[Int]): DataFrame = {
     val cols = df.columns.zipWithIndex.filter(x => !del.contains(x._2 + 1)).map(_._1)
     val newDF = df.select(cols.head, cols.tail: _*)
@@ -33,19 +37,24 @@ object DataFrameUtils {
     newDF
   }
 
-  private def getSingleLhsCount(df: DataFrame, colSize: Int): List[(Int, Int)] = {
-    val res = df.columns.map(col => df.groupBy(col).count().count())
-      .zipWithIndex.map(x => (x._2 + 1, x._1.toInt))
+  private def getSingleLhsCount(df: DataFrame, allSame: mutable.HashSet[Int]): List[(Int, Int)] = {
+    val (res, same) = df.columns.map(col => df.groupBy(col).count().count())
+      .zipWithIndex.map(x => (x._2 + 1, x._1.toInt)).partition(_._2 != 1)
+
+    same.foreach(x => allSame.add(x._1))
 
     res.toList
   }
 
-  def getTwoAttributesCount(df: DataFrame, colSize: Int): List[((Int, Int), Int)] = {
+  def getTwoAttributesCount(df: DataFrame,
+                            colSize: Int,
+                            allSame: mutable.HashSet[Int]
+                           ): List[((Int, Int), Int)] = {
     val columns = df.columns
     val tuples = mutable.ListBuffer.empty[((Int, Int), (String, String))]
 
-    for (i <- 0 until (colSize - 1))
-      for (j <- (i + 1) until colSize)
+    for (i <- 0 until (colSize - 1) if !allSame.contains(i + 1))
+      for (j <- (i + 1) until colSize if !allSame.contains(j + 1))
         tuples.append(((i + 1, j + 1), (columns(i), columns(j))))
 
     val res = tuples.toList.map(x =>
@@ -55,10 +64,11 @@ object DataFrameUtils {
   }
 
   def getBottomFDs(df: DataFrame,
-                   colSize: Int
+                   colSize: Int,
+                   allSame: mutable.HashSet[Int]
                   ): (Array[(Int, Int)], List[(Int, Int)], List[((Int, Int), Int)]) = {
-    val lhs = getSingleLhsCount(df, colSize)
-    val whole = getTwoAttributesCount(df, colSize)
+    val lhs = getSingleLhsCount(df, allSame)
+    val whole = getTwoAttributesCount(df, colSize, allSame)
     val map = whole.groupBy(_._2).map(x => (x._1, x._2.map(_._1)))
     val res = mutable.ListBuffer.empty[(Int, (Int, Int))]
 
