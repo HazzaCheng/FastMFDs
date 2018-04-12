@@ -74,7 +74,7 @@ object MinimalFDsMine {
     }
 
     // recover all fds
-    val fds = recoverAllFDs(results.toList, equalAttrMap, ordersMap, allSame)
+    val fds = recoverAllFDs(results.toList, equalAttrMap, ordersMap, allSame, colSize)
     fds
   }
 
@@ -286,7 +286,8 @@ object MinimalFDsMine {
   def recoverAllFDs(results: List[(Set[Int], Int)],
                     equalAttrMap: Map[Int, List[Int]],
                     ordersMap: Map[Int, Int],
-                    allSame: mutable.HashSet[Int]
+                    allSame: mutable.HashSet[Int],
+                    colSize: Int
                    ): Map[Set[Int], List[Int]] = {
     val fds = mutable.ListBuffer.empty[(Set[Int], Int)]
 
@@ -332,9 +333,9 @@ object MinimalFDsMine {
     }
 
     allSame.toArray.foreach { x =>
-      allSame.toArray.foreach { y =>
-          if (x == y) fds.append((Set.empty[Int], x))
-          else fds.append((Set[Int](x), y))
+      Range(1, colSize + 1).foreach{ y =>
+        if (x == y) fds.append((Set.empty[Int], x))
+        else fds.append((Set[Int](y), x))
       }
     }
 
