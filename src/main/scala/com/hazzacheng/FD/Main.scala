@@ -18,9 +18,9 @@ object Main {
   def main(args: Array[String]): Unit = {
     val conf = new SparkConf()
       .set("spark.default.parallelism", "500")
-      .set("spark.rdd.compress", "true")
-      .set("spark.speculation", "true")
       .set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
+//      .set("spark.rdd.compress", "true")
+//      .set("spark.speculation", "true")
 
     val ss = SparkSession.builder().config(conf).getOrCreate()
     val sc = ss.sparkContext
