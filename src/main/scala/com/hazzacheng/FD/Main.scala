@@ -19,7 +19,7 @@ object Main {
     val conf = new SparkConf()
       .set("spark.default.parallelism", "500")
       .set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
-//      .set("spark.rdd.compress", "true")
+      .set("spark.rdd.compress", "true")
 //      .set("spark.speculation", "true")
 
     val ss = SparkSession.builder().config(conf).getOrCreate()
