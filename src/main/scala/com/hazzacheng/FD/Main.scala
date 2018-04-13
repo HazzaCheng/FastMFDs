@@ -26,9 +26,10 @@ object Main {
     val sc = ss.sparkContext
     val input = args(0)
     val output = args(1)
-    val df = utils.DataFrameUtils.getDataFrameFromCSV(ss, input)
-    val colSize = utils.DataFrameUtils.getColSize(df)
-    val fds = MinimalFDsMine.findOnSpark(sc, df, colSize, input)
+    val temp = args(2)
+    val (df, colSize, tempFilePath) = utils.DataFrameUtils.getDataFrameFromCSV(ss, input, temp)
+//    val colSize = utils.DataFrameUtils.getColSize(df)
+    val fds = MinimalFDsMine.findOnSpark(sc, df, colSize, tempFilePath)
     val res = RddUtils.outPutFormat(fds)
 
     sc.parallelize(res).saveAsTextFile(output)

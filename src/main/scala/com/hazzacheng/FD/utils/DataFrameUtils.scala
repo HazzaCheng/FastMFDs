@@ -1,6 +1,7 @@
 package com.hazzacheng.FD.utils
 
 import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.storage.StorageLevel
 
 import scala.collection.mutable
 
@@ -14,10 +15,31 @@ import scala.collection.mutable
   */
 object DataFrameUtils {
 
-  def getDataFrameFromCSV(ss: SparkSession, filePath: String): DataFrame = {
-    val df = ss.read.csv(filePath)
+  def getDataFrameFromCSV(ss: SparkSession,
+                          filePath: String,
+                          tmpFilePath: String
+                         ): (DataFrame, Int, String) = {
+    val sc = ss.sparkContext
 
-    df
+    var temp = tmpFilePath
+    if (!tmpFilePath.endsWith("/")) temp += "/"
+    temp += System.currentTimeMillis()
+
+    val time = System.currentTimeMillis()
+    val rdd = sc.textFile(filePath).distinct()
+    rdd.saveAsTextFile(temp)
+    rdd.unpersist()
+    println("===== Save File: " + (System.currentTimeMillis() - time) + "ms")
+
+    var df = ss.read.csv(temp)
+    val colSize = df.first.length
+
+ /*   val distinceFD = df.distinct()
+      .repartition(ss.sparkContext.defaultParallelism * 4)
+
+    distinceFD.count()*/
+
+    (df, colSize, temp)
   }
 
   def getColSize(df: DataFrame): Int = {
@@ -30,15 +52,17 @@ object DataFrameUtils {
     df.count()
   }
 
-  def getNewDF(filePath: String, df: DataFrame, del: Set[Int]): DataFrame = {
+  def getNewDF(df: DataFrame, del: Set[Int]): DataFrame = {
     val cols = df.columns.zipWithIndex.filter(x => !del.contains(x._2 + 1)).map(_._1)
-    val newDF = df.select(cols.head, cols.tail: _*)
+    val newDF = df.select(cols.head, cols.tail: _*)//.repartition()
 
     newDF
   }
 
   private def getSingleLhsCount(df: DataFrame, allSame: mutable.HashSet[Int]): List[(Int, Int)] = {
-    val (res, same) = df.columns.map(col => df.groupBy(col).count().count())
+    val (res, same) = df.columns.map(col => df.groupBy(col)
+      .count()
+      .count())
       .zipWithIndex.map(x => (x._2 + 1, x._1.toInt)).partition(_._2 != 1)
 
     same.foreach(x => allSame.add(x._1))
@@ -58,7 +82,9 @@ object DataFrameUtils {
         tuples.append(((i + 1, j + 1), (columns(i), columns(j))))
 
     val res = tuples.toList.map(x =>
-      (x._1, df.groupBy(x._2._1, x._2._2).count().count().toInt))
+      (x._1, df.groupBy(x._2._1, x._2._2)
+        .count()
+        .count().toInt))
 
     res
   }

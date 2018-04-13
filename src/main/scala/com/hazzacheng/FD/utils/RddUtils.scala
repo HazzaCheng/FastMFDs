@@ -20,7 +20,7 @@ object RddUtils {
   def readAsRdd(sc: SparkContext,
                 filePath: String,
                 del: scala.List[Int]): RDD[Array[String]] = {
-    val rdd = sc.textFile(filePath, sc.defaultParallelism * 4)
+    val rdd = sc.textFile(filePath, sc.defaultParallelism)
       .map(line => line.split(",")
         .zipWithIndex.filter(x => !del.contains(x._2 + 1)).map(_._1))
 

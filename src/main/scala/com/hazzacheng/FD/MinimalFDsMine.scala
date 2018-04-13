@@ -23,8 +23,9 @@ object MinimalFDsMine {
   def findOnSpark(sc: SparkContext,
                   df: DataFrame,
                   colSize: Int,
-                  filePath: String): Map[Set[Int], List[Int]] = {
-    df.persist(StorageLevel.MEMORY_AND_DISK_SER)
+                  filePath: String
+                 ): Map[Set[Int], List[Int]] = {
+//    df.persist(StorageLevel.MEMORY_AND_DISK_SER)
     val results = mutable.ListBuffer.empty[(Set[Int], Int)]
     val allSame = mutable.HashSet.empty[Int]
     val lessAttrsCountMap = mutable.HashMap.empty[Set[Int], Int]
@@ -42,8 +43,11 @@ object MinimalFDsMine {
     val bottomFDs = getNewBottomFDs(withoutEqualAttr, ordersMap, equalAttrMap)
     results ++= bottomFDs
     // get new df
-    val newDF = DataFrameUtils.getNewDF(filePath, df, del.toSet).persist(StorageLevel.MEMORY_AND_DISK_SER)
+    val newDF = DataFrameUtils.getNewDF(df, del.toSet).persist(StorageLevel.MEMORY_AND_DISK_SER)
     df.unpersist()
+    val newSize = newDF.count()
+    println("====== New DF Count: " + newSize)
+
     // check the fds with the longest lhs
     val topCandidates = getLongestLhs(newColSize)
     CandidatesUtils.cutInTopLevels(topCandidates, bottomFDs)
@@ -60,12 +64,6 @@ object MinimalFDsMine {
     else
       findByDfAndRdd(sc, newDF, filePath, del, newColSize, orders,
         candidates, lessAttrsCountMap, moreAttrsCountMap, topFDs, results)
-
-   /* // check empty lhs
-    val emptyFD = mutable.ListBuffer.empty[Int]
-    emptyFD ++= orders.filter(_._2.toInt == 1).map(_._1)
-    if (emptyFD.nonEmpty)
-      emptyFD.toList.foreach(rhs => results.append((Set.empty[Int], rhs)))*/
 
     // check the top levels
     if (topFDs.nonEmpty) {
