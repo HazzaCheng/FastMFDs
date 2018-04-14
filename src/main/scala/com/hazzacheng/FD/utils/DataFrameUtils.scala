@@ -119,21 +119,25 @@ object DataFrameUtils {
     (fds, lhs, whole)
   }
 
-  def getTopFDs(attrsCountMap: mutable.HashMap[Set[Int], Int],
+  def getTopFDs(moreAttrsCountMap: mutable.HashMap[Set[Int], Int],
                 df: DataFrame,
                 topCandidates: mutable.Set[(Set[Int], Int)],
+                rhsCount: Map[Int, Int]
                ): (mutable.Set[(Set[Int], Int)], Array[(Set[Int], Int)]) = {
     val cols = df.columns
 
     val (topFDs, wrong) = topCandidates.partition{x =>
+
       val lhs = x._1.map(y => cols(y - 1)).toArray
-      val whole = df.groupBy(cols(x._2 - 1), lhs: _*).count().count()
-      val left = df.groupBy(lhs.head, lhs.tail: _*).count().count()
+      val whole = moreAttrsCountMap.getOrElseUpdate(x._1 + x._2,
+        df.groupBy(cols(x._2 - 1), lhs: _*).count().count().toInt)
+      if (whole >= rhsCount(x._2)) {
+        val left = moreAttrsCountMap.getOrElseUpdate(x._1,
+          df.groupBy(lhs.head, lhs.tail: _*).count().count().toInt)
 
-      attrsCountMap.put(x._1, left.toInt)
-      attrsCountMap.put(x._1 + x._2, whole.toInt)
+        whole == left
+      } else false
 
-      whole == left
     }
 
     (topFDs, wrong.toArray)
