@@ -60,10 +60,10 @@ object MinimalFDsMine {
 
     // find the minimal fds in the middle levels
     if (newColSize <= 10)
-      findByDf(newDF, newColSize, candidates, lessAttrsCountMap, moreAttrsCountMap, topFDs, results, orders)
+      findByDf(newDF, newColSize, candidates, lessAttrsCountMap, moreAttrsCountMap, topFDs, results, orders, rhsCount)
     else
       findByDfAndRdd(sc, newDF, filePath, del, newColSize, orders,
-        candidates, lessAttrsCountMap, moreAttrsCountMap, topFDs, results)
+        candidates, lessAttrsCountMap, moreAttrsCountMap, topFDs, results, rhsCount)
 
     // check the top levels
     if (topFDs.nonEmpty) {
@@ -83,7 +83,8 @@ object MinimalFDsMine {
                        moreAttrsCountMap: mutable.HashMap[Set[Int], Int],
                        topFDs: mutable.Set[(Set[Int], Int)],
                        results: mutable.ListBuffer[(Set[Int], Int)],
-                       orders:  Array[(Int, Int)]
+                       orders:  Array[(Int, Int)],
+                       rhsCount: Map[Int, Int]
                       ): Unit = {
     val middle = (newColSize + 1) / 2
     for (level <- 2 to middle) {
@@ -94,7 +95,7 @@ object MinimalFDsMine {
         val toCheckedHigh = CandidatesUtils.getLevelCandidates(candidates, symmetrical)
         println("====df toCheckedHigh: " + "level- " + symmetrical + " " + " lhs: " + toCheckedHigh.toList.length + " whole: " + toCheckedHigh.toList.flatMap(x => x._2.toList).size)
         if (toCheckedHigh.nonEmpty) {
-          val failFDs = DataFrameUtils.getFailFDs(newDF, toCheckedHigh, moreAttrsCountMap, topFDs)
+          val failFDs = DataFrameUtils.getFailFDs(newDF, toCheckedHigh, moreAttrsCountMap, topFDs, rhsCount)
           println("====failFDs: " + "level- " + symmetrical + " " + failFDs.toList.toString() )
           CandidatesUtils.cutFromTopToDown(candidates, failFDs)
         }
@@ -106,7 +107,7 @@ object MinimalFDsMine {
       println("====df toCheckedLow: " + "level- " + level + " " + " lhs: " + toCheckedLow.toList.length + " whole: " + toCheckedLow.toList.flatMap(x => x._2.toList).size)
       if (toCheckedLow.nonEmpty) {
         val time0 = System.currentTimeMillis()
-        val minimalFds = DataFrameUtils.getMinimalFDs(newDF, toCheckedLow, lessAttrsCountMap)
+        val minimalFds = DataFrameUtils.getMinimalFDs(newDF, toCheckedLow, lessAttrsCountMap, rhsCount)
         println("====minimalFDs: " + "level-" + level + " " + minimalFds.toList.toString())
         results ++= minimalFds
         CandidatesUtils.cutFromDownToTop(candidates, minimalFds)
@@ -127,7 +128,8 @@ object MinimalFDsMine {
                              lessAttrsCountMap: mutable.HashMap[Set[Int], Int],
                              moreAttrsCountMap: mutable.HashMap[Set[Int], Int],
                              topFDs: mutable.Set[(Set[Int], Int)],
-                             results: mutable.ListBuffer[(Set[Int], Int)]
+                             results: mutable.ListBuffer[(Set[Int], Int)],
+                             rhsCount: Map[Int, Int]
                             ): Unit = {
     val commmonAttr = orders.head._1
     val rdd = RddUtils.readAsRdd(sc, filePath, del).persist(StorageLevel.MEMORY_AND_DISK_SER)
@@ -146,7 +148,7 @@ object MinimalFDsMine {
         val toCheckedHigh = CandidatesUtils.getLevelCandidates(candidates, symmetrical)
         println("====toCheckedHigh: " + "level- " + symmetrical + " " + " lhs: " + toCheckedHigh.toList.length + " whole: " + toCheckedHigh.toList.flatMap(x => x._2.toList).size)
         if (toCheckedHigh.nonEmpty) {
-          val failFDs = DataFrameUtils.getFailFDs(newDF, toCheckedHigh, moreAttrsCountMap, topFDs)
+          val failFDs = DataFrameUtils.getFailFDs(newDF, toCheckedHigh, moreAttrsCountMap, topFDs, rhsCount)
           CandidatesUtils.cutFromTopToDown(candidates, failFDs)
         }
         println("====toCheckedHigh time: " + "level- " + symmetrical + " " + (System.currentTimeMillis() - time0))
@@ -169,7 +171,7 @@ object MinimalFDsMine {
         }
       }
       if (toCheckedLow.nonEmpty) {
-        val minimalFds = DataFrameUtils.getMinimalFDs(newDF, toCheckedLow, lessAttrsCountMap)
+        val minimalFds = DataFrameUtils.getMinimalFDs(newDF, toCheckedLow, lessAttrsCountMap, rhsCount)
         results ++= minimalFds
         CandidatesUtils.cutFromDownToTop(candidates, minimalFds)
         CandidatesUtils.cutInTopLevels(topFDs, minimalFds)
@@ -236,7 +238,7 @@ object MinimalFDsMine {
     val ordersMap = mutable.Map.empty[Int, Int]
     val tmp = mutable.Set.empty[Int]
     val del = mutable.ListBuffer.empty[Int]
-    Range(1, colSize + 1).foreach(tmp.add(_))
+    Range(1, colSize + 1).foreach(tmp.add)
     tmp --= allSame
     del ++= allSame
 

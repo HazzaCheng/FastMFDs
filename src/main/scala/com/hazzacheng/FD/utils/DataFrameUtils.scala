@@ -152,16 +152,17 @@ object DataFrameUtils {
 
   def getMinimalFDs(df: DataFrame,
                     toChecked: mutable.HashMap[Set[Int], mutable.Set[Int]],
-                    lessAttrsCountMap: mutable.HashMap[Set[Int], Int]
+                    lessAttrsCountMap: mutable.HashMap[Set[Int], Int],
+                    rhsCount: Map[Int, Int]
                    ): Array[(Set[Int], Int)] = {
     val biggerMap = mutable.HashMap.empty[Set[Int], Int]
     val fds = toChecked.toList.flatMap(x => x._2.map((x._1, _))).toArray
-    //println("=====fd all: " + fds.length + " " + fds.toList.toString())
     val minimalFDs = fds.filter{fd =>
       val lhs = lessAttrsCountMap.getOrElseUpdate(fd._1, getAttrsCount(df, fd._1))
-      val whole = biggerMap.getOrElseUpdate(fd._1 + fd._2, getAttrsCount(df, fd._1 + fd._2))
-      //println("====fds: " + fd.toString() + " lhs" + lhs + " whole " + whole)
-      lhs == whole
+      if (lhs >= rhsCount(fd._2)) {
+        val whole = biggerMap.getOrElseUpdate(fd._1 + fd._2, getAttrsCount(df, fd._1 + fd._2))
+        lhs == whole
+      } else false
     }
 
     lessAttrsCountMap.clear()
@@ -173,15 +174,18 @@ object DataFrameUtils {
   def getFailFDs(df: DataFrame,
                  toChecked: mutable.HashMap[Set[Int], mutable.Set[Int]],
                  moreAttrsCountMap: mutable.HashMap[Set[Int], Int],
-                 topFDs: mutable.Set[(Set[Int], Int)]
+                 topFDs: mutable.Set[(Set[Int], Int)],
+                 rhsCount: Map[Int, Int]
                 ): Array[(Set[Int], Int)] = {
     val smallerMap = mutable.HashMap.empty[Set[Int], Int]
     val fds = toChecked.flatMap(x => x._2.map((x._1, _))).toArray
 
     val failFDs = fds.filter{fd =>
-      val lhs = smallerMap.getOrElseUpdate(fd._1, getAttrsCount(df, fd._1))
       val whole = moreAttrsCountMap.getOrElseUpdate(fd._1 + fd._2, getAttrsCount(df, fd._1 + fd._2))
-      lhs != whole
+      if (whole >= rhsCount(fd._2)) {
+        val lhs = smallerMap.getOrElseUpdate(fd._1, getAttrsCount(df, fd._1))
+        lhs != whole
+      } else true
     }
 
     val rightFDs = fds.toSet -- failFDs
