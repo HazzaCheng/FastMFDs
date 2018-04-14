@@ -35,7 +35,7 @@ object MinimalFDsMine {
     // get equal attributes
     val (equalAttr, withoutEqualAttr) = getEqualAttr(singleFDs)
     // get new orders
-    val (equalAttrMap, ordersMap, orders, del) = createNewOrders(lessAttrsCountMap, equalAttr, singleLhsCount, colSize, twoAttrsCount, allSame)
+    val (equalAttrMap, ordersMap, orders, del, rhsCount) = createNewOrders(lessAttrsCountMap, equalAttr, singleLhsCount, colSize, twoAttrsCount, allSame)
     val newColSize = orders.length
     println("====== Now Attrs Count: " + newColSize + " Cut: " + (colSize - newColSize))
 
@@ -51,7 +51,7 @@ object MinimalFDsMine {
     // check the fds with the longest lhs
     val topCandidates = getLongestLhs(newColSize)
     CandidatesUtils.cutInTopLevels(topCandidates, bottomFDs)
-    val (topFDs, wrongTopFDs) = DataFrameUtils.getTopFDs(moreAttrsCountMap, newDF, topCandidates)
+    val (topFDs, wrongTopFDs) = DataFrameUtils.getTopFDs(moreAttrsCountMap, newDF, topCandidates, rhsCount)
     // get all candidates FD without bottom level and top level
     val candidates = CandidatesUtils.removeTopAndBottom(CandidatesUtils.getCandidates(newColSize), newColSize)
     // cut from bottom level and top level
@@ -179,6 +179,21 @@ object MinimalFDsMine {
 
   }
 
+  def findBySplit(sc: SparkContext,
+                  newDF: DataFrame,
+                  filePath: String,
+                  del: List[Int],
+                  newColSize: Int,
+                  orders: Array[(Int, Int)],
+                  candidates: mutable.HashMap[Set[Int], mutable.Set[Int]],
+                  lessAttrsCountMap: mutable.HashMap[Set[Int], Int],
+                  moreAttrsCountMap: mutable.HashMap[Set[Int], Int],
+                  topFDs: mutable.Set[(Set[Int], Int)],
+                  results: mutable.ListBuffer[(Set[Int], Int)]
+                 ): Unit = {
+
+  }
+
   def getEqualAttr(fds: Array[(Int, Int)]): (List[Set[Int]], Array[(Int, Int)]) = {
     val len = fds.length
     val tmp = mutable.HashSet.empty[(Int, Int)]
@@ -212,12 +227,11 @@ object MinimalFDsMine {
 
   def createNewOrders(attrsCountMap: mutable.HashMap[Set[Int], Int],
                       equalAttr: List[Set[Int]],
-                      singleLhsCount: List[(Int, Int)],
+                      singleLhsCountMap: Map[Int, Int],
                       colSize: Int,
                       twoAttrsCount: List[((Int, Int), Int)],
                       allSame: mutable.HashSet[Int]
-                     ): (Map[Int, List[Int]], Map[Int, Int], Array[(Int, Int)], List[Int]) = {
-    val maps = singleLhsCount.toMap
+                     ): (Map[Int, List[Int]], Map[Int, Int], Array[(Int, Int)], List[Int], Map[Int, Int]) = {
     val equalAttrMap = mutable.Map.empty[Int, List[Int]]
     val ordersMap = mutable.Map.empty[Int, Int]
     val tmp = mutable.Set.empty[Int]
@@ -227,7 +241,7 @@ object MinimalFDsMine {
     del ++= allSame
 
     equalAttr.foreach { x =>
-      val maxAttr = x.maxBy(y => maps(y))
+      val maxAttr = x.maxBy(y => singleLhsCountMap(y))
       val smallAttr = x.filter(_ != maxAttr).toList
       del ++= smallAttr
       tmp --= smallAttr
@@ -240,15 +254,18 @@ object MinimalFDsMine {
       count += 1
     }
 
-    val orders = ordersMap.toArray.map(x => (x._1, maps(x._2)))
-      .sortWith((x, y) => x._2 > y._2)
+    val orders = ordersMap.toArray.map {
+      x => (x._1, singleLhsCountMap(x._2))
+    }.sortWith((x, y) => x._2 > y._2)
     val delSet = del.toSet
     val swappedOrdersMap = ordersMap.map(x => (x._2, x._1))
+    val rhsCount = singleLhsCountMap.filter(x => tmp.contains(x._1))
+      .map(x => (swappedOrdersMap(x._1), x._2))
     twoAttrsCount.map(x => (Set[Int](x._1._1, x._1._2), x._2))
       .filter(x => (x._1 & delSet).isEmpty)
       .foreach(x => attrsCountMap.put(x._1.map(swappedOrdersMap(_)), x._2))
 
-    (equalAttrMap.toMap, ordersMap.toMap, orders, del.toList.sorted)
+    (equalAttrMap.toMap, ordersMap.toMap, orders, del.toList.sorted, rhsCount)
   }
 
   def getNewBottomFDs(singleFDs: Array[(Int, Int)],

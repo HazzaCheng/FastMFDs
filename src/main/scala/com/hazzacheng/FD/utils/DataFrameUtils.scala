@@ -65,7 +65,9 @@ object DataFrameUtils {
     newDF
   }
 
-  private def getSingleLhsCount(df: DataFrame, allSame: mutable.HashSet[Int]): List[(Int, Int)] = {
+  private def getSingleLhsCount(df: DataFrame,
+                                allSame: mutable.HashSet[Int]
+                               ): Map[Int, Int] = {
     val (res, same) = df.columns.map(col => df.groupBy(col)
       .count()
       .count())
@@ -73,11 +75,12 @@ object DataFrameUtils {
 
     same.foreach(x => allSame.add(x._1))
 
-    res.toList
+    res.toMap
   }
 
   def getTwoAttributesCount(df: DataFrame,
                             colSize: Int,
+                            singleLhsCount :Map[Int, Int],
                             allSame: mutable.HashSet[Int]
                            ): List[((Int, Int), Int)] = {
     val columns = df.columns
@@ -85,7 +88,7 @@ object DataFrameUtils {
 
     for (i <- 0 until (colSize - 1) if !allSame.contains(i + 1))
       for (j <- (i + 1) until colSize if !allSame.contains(j + 1))
-        tuples.append(((i + 1, j + 1), (columns(i), columns(j))))
+          tuples.append(((i + 1, j + 1), (columns(i), columns(j))))
 
     val res = tuples.toList.map(x =>
       (x._1, df.groupBy(x._2._1, x._2._2)
@@ -98,9 +101,9 @@ object DataFrameUtils {
   def getBottomFDs(df: DataFrame,
                    colSize: Int,
                    allSame: mutable.HashSet[Int]
-                  ): (Array[(Int, Int)], List[(Int, Int)], List[((Int, Int), Int)]) = {
+                  ): (Array[(Int, Int)], Map[Int, Int], List[((Int, Int), Int)]) = {
     val lhs = getSingleLhsCount(df, allSame)
-    val whole = getTwoAttributesCount(df, colSize, allSame)
+    val whole = getTwoAttributesCount(df, colSize, lhs, allSame)
     val map = whole.groupBy(_._2).map(x => (x._1, x._2.map(_._1)))
     val res = mutable.ListBuffer.empty[(Int, (Int, Int))]
 
@@ -118,7 +121,7 @@ object DataFrameUtils {
 
   def getTopFDs(attrsCountMap: mutable.HashMap[Set[Int], Int],
                 df: DataFrame,
-                topCandidates: mutable.Set[(Set[Int], Int)]
+                topCandidates: mutable.Set[(Set[Int], Int)],
                ): (mutable.Set[(Set[Int], Int)], Array[(Set[Int], Int)]) = {
     val cols = df.columns
 
@@ -137,11 +140,9 @@ object DataFrameUtils {
   }
 
   def getAttrsCount(df: DataFrame, attrs: Set[Int]): Int = {
-    val time0 = System.currentTimeMillis()
     val cols = df.columns
     val attrsCols = attrs.toArray.map(x => cols(x - 1))
     val count = df.groupBy(attrsCols.head, attrsCols.tail: _*).count().count()
-    //println("====Test: groupBy size: " + attrs.size + " time: " + (System.currentTimeMillis() - time0))
     count.toInt
   }
 
