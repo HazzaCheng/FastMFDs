@@ -26,12 +26,18 @@ object DataFrameUtils {
     temp += System.currentTimeMillis()
 
     val time = System.currentTimeMillis()
-    val rdd = sc.textFile(filePath).distinct()
+    val rdd = sc.textFile(filePath).distinct().persist()
+    val words = rdd.flatMap(_.split(",")).distinct().zipWithIndex().collect().sortBy(_._2)
+    println("===== Words: " + words.length)
+    val words2index = mutable.HashMap.empty[String, Long]
+    words.foreach(x => words2index.put(x._1, x._2))
+    val words2indexBV = sc.broadcast(words2index)
+    rdd.map(x => x.split(",").map(words2indexBV.value(_)).mkString(","))
     rdd.saveAsTextFile(temp)
     rdd.unpersist()
     println("===== Save File: " + (System.currentTimeMillis() - time) + "ms")
 
-    var df = ss.read.csv(temp)
+    var df = ss.read.csv(temp).persist(StorageLevel.MEMORY_AND_DISK_SER)
     val colSize = df.first.length
 
  /*   val distinceFD = df.distinct()
