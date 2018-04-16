@@ -33,19 +33,22 @@ object RddUtils {
   }
 
   def getMinimalFDs(sc: SparkContext,
-                    partitionsRDD: RDD[(String, List[Array[String]])],
+                    partitionsRDD: RDD[(Int, List[Array[Int]])],
                     fds: List[(Set[Int], mutable.Set[Int])],
                     res: mutable.ListBuffer[(Set[Int], Int)],
                     partitionSize: Int,
                     colSize: Int,
-                    levelMap: mutable.HashMap[String, mutable.HashSet[(Set[Int], Int)]]
-                   ): (Array[(Set[Int], Int)], Set[(Set[Int], Int)], Array[(String, List[(Set[Int], Int)])]) = {
+                    levelMap: mutable.HashMap[Int, mutable.HashSet[(Set[Int], Int)]]
+                   ): (Array[(Set[Int], Int)], Set[(Set[Int], Int)], Array[(Int, List[(Set[Int], Int)])]) = {
+
     val fdsBV = sc.broadcast(fds)
     val levelMapBV = sc.broadcast(levelMap)
+
     val tuplesRDD = partitionsRDD.map(p => checkEachPartition(fdsBV, levelMapBV, p, colSize))
       .persist(StorageLevel.MEMORY_AND_DISK_SER)
     val duplicatesRDD = tuplesRDD.flatMap(x => x._2)
       .persist(StorageLevel.MEMORY_AND_DISK_SER)
+
     val candidates = duplicatesRDD.map(x => (x, 1)).reduceByKey(_ + _).collect()
     // TODO: local vs parallel
     val minimalFDs = candidates.filter(_._2 == partitionSize).map(_._1)
@@ -62,23 +65,25 @@ object RddUtils {
   }
 
   private def checkEachPartition(fdsBV: Broadcast[List[(Set[Int], mutable.Set[Int])]],
-                                 levelMapBV: Broadcast[mutable.HashMap[String, mutable.HashSet[(Set[Int], Int)]]],
-                                 partition: (String, List[Array[String]]),
-                                 colSize: Int): (String, List[(Set[Int], Int)]) = {
+                                 levelMapBV: Broadcast[mutable.HashMap[Int, mutable.HashSet[(Set[Int], Int)]]],
+                                 partition: (Int, List[Array[Int]]),
+                                 colSize: Int): (Int, List[(Set[Int], Int)]) = {
+
     val levelMap = levelMapBV.value.getOrElse(partition._1, mutable.HashSet.empty[(Set[Int], Int)])
     val minimalFDs = fdsBV.value.flatMap(fd => checkFD(partition._2, levelMap, fd._1, fd._2, colSize))
 
     (partition._1, minimalFDs)
   }
 
-  def checkFD(partition: List[Array[String]],
+  def checkFD(partition: List[Array[Int]],
               levelMap: mutable.HashSet[(Set[Int], Int)],
               lhs: Set[Int],
               rhs: mutable.Set[Int],
               colSize: Int): List[(Set[Int], Int)] = {
+
     val true_rhs = rhs.clone()
     val tmp = mutable.Set.empty[Int]
-    val dict = mutable.HashMap.empty[String, Array[String]]
+    val dict = mutable.HashMap.empty[Int, Array[Int]]
 
     rhs.foreach{r =>
       if (levelMap contains (lhs, r)) {
@@ -104,10 +109,10 @@ object RddUtils {
   }
 
   def getFailFDs(sc: SparkContext,
-                 partitionsRDD: RDD[(String, List[Array[String]])],
+                 partitionsRDD: RDD[(Int, List[Array[Int]])],
                  fds: List[(Set[Int], mutable.Set[Int])],
                  colSize: Int,
-                 levelMap: mutable.HashMap[String, mutable.HashMap[Set[Int], Int]]
+                 levelMap: mutable.HashMap[Int, mutable.HashMap[Set[Int], Int]]
                 ): Array[(Set[Int], Int)] = {
     val fdsBV = sc.broadcast(fds)
     val levelMapBV = sc.broadcast(levelMap)
@@ -129,17 +134,17 @@ object RddUtils {
   }
 
   private def checkEachPartitionForWrong(fdsBV: Broadcast[List[(Set[Int], mutable.Set[Int])]],
-                                         levelMapBV: Broadcast[mutable.HashMap[String, mutable.HashMap[Set[Int], Int]]],
-                                         partition: (String, List[Array[String]]),
+                                         levelMapBV: Broadcast[mutable.HashMap[Int, mutable.HashMap[Set[Int], Int]]],
+                                         partition: (Int, List[Array[Int]]),
                                          colSize: Int
-                                        ): (String,  List[(List[(Set[Int], Int)], (Set[Int], Int))]) = {
+                                        ): (Int,  List[(List[(Set[Int], Int)], (Set[Int], Int))]) = {
     val levelMap = levelMapBV.value.getOrElse(partition._1, mutable.HashMap.empty[Set[Int], Int])
     val minimalFDs = fdsBV.value.map(fd => checkFD(partition._2, levelMap, fd._1, fd._2, colSize))
 
     (partition._1, minimalFDs)
   }
 
-  def checkFD(partition: List[Array[String]],
+  def checkFD(partition: List[Array[Int]],
               levelMap: mutable.HashMap[Set[Int], Int],
               lhs: Set[Int],
               rhs: mutable.Set[Int],
@@ -154,25 +159,25 @@ object RddUtils {
     (wrong.toList, (lhs, lhsCount))
   }
 
-  private def takeAttrLHS(arr: Array[String],
-                          attributes: Set[Int]): String = {
+  private def takeAttrLHS(arr: Array[Int],
+                          attributes: Set[Int]): Int = {
     val s = mutable.StringBuilder.newBuilder
     attributes.toList.foreach(attr => s.append(arr(attr - 1) + " "))
 
-    s.toString()
+    s.toString().hashCode
   }
 
-  private def takeAttrRHS(arr: Array[String],
+  private def takeAttrRHS(arr: Array[Int],
                           attributes: mutable.Set[Int],
-                          colSize: Int): Array[String] = {
-    val res = new Array[String](colSize + 1)
+                          colSize: Int): Array[Int] = {
+    val res = new Array[Int](colSize + 1)
     attributes.toList.foreach(attr => res(attr) = arr(attr - 1))
     res
   }
 
   def updateLevelMap(cuttedFDsMap: mutable.HashMap[(Set[Int], Int), mutable.HashSet[(Set[Int], Int)]],
-                     partWithFailFDs: Array[(String, List[(Set[Int], Int)])],
-                     levelMap: mutable.HashMap[String, mutable.HashSet[(Set[Int], Int)]],
+                     partWithFailFDs: Array[(Int, List[(Set[Int], Int)])],
+                     levelMap: mutable.HashMap[Int, mutable.HashSet[(Set[Int], Int)]],
                      level: Int): Unit = {
     partWithFailFDs.foreach{x =>
       val cutted = levelMap.getOrElse(x._1, mutable.HashSet.empty[(Set[Int], Int)])

@@ -131,13 +131,16 @@ object MinimalFDsMine {
                              results: mutable.ListBuffer[(Set[Int], Int)],
                              rhsCount: Map[Int, Int]
                             ): Unit = {
+
     val commmonAttr = orders.head._1
-    val rdd = RddUtils.readAsRdd(sc, filePath, del).persist(StorageLevel.MEMORY_AND_DISK_SER)
+
+    val rdd = DataFrameUtils.dfToRdd(newDF).persist(StorageLevel.MEMORY_AND_DISK_SER)
     val partitionRDD = repart(sc, rdd, commmonAttr).persist(StorageLevel.MEMORY_AND_DISK_SER)
     val partitionSize = orders.head._2
+
     // create the map which save cutted leaves from bottom to top
     val wholeCuttedMap = mutable.HashMap
-      .empty[String, mutable.HashSet[(Set[Int], Int)]]
+      .empty[Int, mutable.HashSet[(Set[Int], Int)]]
 
     val middle = (newColSize + 1) / 2
     for (level <- 2 to middle) {
@@ -292,8 +295,8 @@ object MinimalFDsMine {
   }
 
   private def repart(sc: SparkContext,
-                     rdd: RDD[Array[String]],
-                     attribute: Int): RDD[(String, List[Array[String]])] = {
+                     rdd: RDD[Array[Int]],
+                     attribute: Int): RDD[(Int, List[Array[Int]])] = {
     val partitions = rdd.map(line => (line(attribute - 1), List(line)))
       .reduceByKey(_ ++ _)
 

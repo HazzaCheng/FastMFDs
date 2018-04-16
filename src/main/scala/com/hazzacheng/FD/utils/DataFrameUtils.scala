@@ -1,6 +1,8 @@
 package com.hazzacheng.FD.utils
 
-import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.types.{DataType, IntegerType, StructType}
+import org.apache.spark.sql.{DataFrame, Row, SQLContext, SparkSession}
 import org.apache.spark.storage.StorageLevel
 
 import scala.collection.mutable
@@ -15,7 +17,7 @@ import scala.collection.mutable
   */
 object DataFrameUtils {
 
-  def getDataFrameFromCSV(ss: SparkSession,
+/*  def getDataFrameFromCSV(ss: SparkSession,
                           filePath: String,
                           tmpFilePath: String
                          ): (DataFrame, Int, String) = {
@@ -40,12 +42,61 @@ object DataFrameUtils {
     var df = ss.read.csv(temp).persist(StorageLevel.MEMORY_AND_DISK_SER)
     val colSize = df.first.length
 
- /*   val distinceFD = df.distinct()
-      .repartition(ss.sparkContext.defaultParallelism * 4)
+    (df, colSize, temp)
+  }*/
 
-    distinceFD.count()*/
+  def getDataFrameFromCSV(ss: SparkSession,
+                          filePath: String,
+                          tmpFilePath: String
+                         ): (DataFrame, Int, String) = {
+    val sc = ss.sparkContext
+
+    var temp = tmpFilePath
+    if (!tmpFilePath.endsWith("/")) temp += "/"
+    temp += System.currentTimeMillis()
+
+    val time = System.currentTimeMillis()
+    val rdd = sc.textFile(filePath).distinct().persist()
+    val colSize = rdd.first().split(",").length
+    val words = rdd.flatMap(_.split(",")).distinct().zipWithIndex().collect()
+      .sortBy(_._2).map(x => (x._1, x._2.toInt))
+    println("===== Words: " + words.length)
+    val words2index = mutable.HashMap.empty[String, Int]
+    words.foreach(x => words2index.put(x._1, x._2))
+    val words2indexBV = sc.broadcast(words2index)
+    val rowRDD = rdd.map(x => Row.fromSeq(x.split(",").map(words2indexBV.value(_))))
+    val schema = createSchema(colSize)
+    val df = castColumnTo(ss.createDataFrame(rowRDD, schema), IntegerType)
+      .persist(StorageLevel.MEMORY_AND_DISK_SER)
+    if (df.first().length != colSize) println("====== WRONG!!!!")
+    rdd.unpersist()
+    rowRDD.unpersist()
+    println("===== Save File: " + (System.currentTimeMillis() - time) + "ms")
 
     (df, colSize, temp)
+  }
+
+  def dfToRdd(df: DataFrame): RDD[Array[Int]] = {
+    val rdd = df.rdd.map(r => r.toSeq.toArray.map(_.asInstanceOf[Int]))
+
+    rdd
+  }
+
+  def createSchema(colSize: Int): StructType = {
+    var schema = new StructType()
+
+    Range(0, colSize).foreach(x => schema = schema.add("c" + x, IntegerType, true))
+
+    schema
+  }
+
+  def castColumnTo(df: DataFrame, tpe: DataType): DataFrame = {
+    val cols = df.columns
+    var temp = df
+
+    cols.foreach(x => temp = temp.withColumn(x, temp(x).cast(tpe)))
+
+    temp
   }
 
   def getColSize(df: DataFrame): Int = {
@@ -196,7 +247,5 @@ object DataFrameUtils {
 
     failFDs
   }
-
-
 
 }
