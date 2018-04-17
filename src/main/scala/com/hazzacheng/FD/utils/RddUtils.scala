@@ -182,15 +182,16 @@ object RddUtils {
                      levelMap: mutable.HashMap[Int, mutable.HashSet[(Set[Int], Int)]],
                      level: Int): Unit = {
     partWithFailFDs.foreach{x =>
-      val cutted = levelMap.getOrElse(x._1, mutable.HashSet.empty[(Set[Int], Int)])
-        .filter(_._1.size > level)
+     /* val cutted = levelMap.getOrElse(x._1, mutable.HashSet.empty[(Set[Int], Int)])
+        .filter(_._1.size > level)*/
+      val cutted = mutable.HashSet.empty[(Set[Int], Int)]
 
       x._2.foreach{y =>
         val value = cuttedFDsMap.getOrElse(y, mutable.HashSet.empty[(Set[Int], Int)])
         if (value.nonEmpty) cutted ++= value
       }
 
-      if (cutted.nonEmpty) levelMap.update(x._1, cutted)
+      levelMap.update(x._1, cutted)
     }
   }
 

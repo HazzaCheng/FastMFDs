@@ -17,34 +17,6 @@ import scala.collection.mutable
   */
 object DataFrameUtils {
 
-/*  def getDataFrameFromCSV(ss: SparkSession,
-                          filePath: String,
-                          tmpFilePath: String
-                         ): (DataFrame, Int, String) = {
-    val sc = ss.sparkContext
-
-    var temp = tmpFilePath
-    if (!tmpFilePath.endsWith("/")) temp += "/"
-    temp += System.currentTimeMillis()
-
-    val time = System.currentTimeMillis()
-    val rdd = sc.textFile(filePath).distinct().persist()
-    val words = rdd.flatMap(_.split(",")).distinct().zipWithIndex().collect().sortBy(_._2)
-    println("===== Words: " + words.length)
-    val words2index = mutable.HashMap.empty[String, Long]
-    words.foreach(x => words2index.put(x._1, x._2))
-    val words2indexBV = sc.broadcast(words2index)
-    rdd.map(x => x.split(",").map(words2indexBV.value(_)).mkString(","))
-    rdd.saveAsTextFile(temp)
-    rdd.unpersist()
-    println("===== Save File: " + (System.currentTimeMillis() - time) + "ms")
-
-    var df = ss.read.csv(temp).persist(StorageLevel.MEMORY_AND_DISK_SER)
-    val colSize = df.first.length
-
-    (df, colSize, temp)
-  }*/
-
   def getDataFrameFromCSV(ss: SparkSession,
                           numPartitions: Int,
                           filePath: String,
@@ -58,7 +30,6 @@ object DataFrameUtils {
 
     val time = System.currentTimeMillis()
     val rdd = sc.textFile(filePath).distinct().persist()
-//    val colSize = rdd.first().split(",").length
     val words = rdd.flatMap(_.split(",")).distinct().zipWithIndex().collect()
       .sortBy(_._2).map(x => (x._1, x._2.toInt))
     println("===== Words: " + words.length)
@@ -66,16 +37,10 @@ object DataFrameUtils {
     words.foreach(x => words2index.put(x._1, x._2))
     val words2indexBV = sc.broadcast(words2index)
     rdd.map(x => x.split(",").map(words2indexBV.value(_)).mkString(",")).saveAsTextFile(temp)
-    /*val rowRDD = rdd.map(x => Row.fromSeq(x.split(",").map(words2indexBV.value(_))))
-    val schema = createSchema(colSize)
-    val df = castColumnTo(ss.createDataFrame(rowRDD, schema), IntegerType)
-      .repartition(numPartitions)
-      .persist(StorageLevel.MEMORY_AND_DISK_SER)
-    if (df.first().length != colSize) println("====== WRONG!!!!")*/
+
     rdd.unpersist()
     println("===== Save File: " + (System.currentTimeMillis() - time) + "ms")
 
-//    val df = castColumnTo(ss.read.csv(temp), IntegerType).persist(StorageLevel.MEMORY_AND_DISK_SER)
     val df = ss.read.csv(temp).persist(StorageLevel.MEMORY_AND_DISK_SER)
 
     val colSize = df.first.length

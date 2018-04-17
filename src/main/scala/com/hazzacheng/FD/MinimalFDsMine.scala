@@ -42,7 +42,7 @@ class MinimalFDsMine(private var numPartitions: Int,
   val rhsCount = mutable.Map.empty[Int, Int]
   val rdds = mutable.Map.empty[Int, RDD[(Int, List[Array[Int]])]]
   val rddsCountMap = mutable.Map.empty[Int, Int]
-  val THRESHOLD = 20
+  val THRESHOLD = 10
 
   def setNumPartitions(numPartitions: Int): this.type = {
     this.numPartitions = numPartitions
@@ -82,11 +82,12 @@ class MinimalFDsMine(private var numPartitions: Int,
     CandidatesUtils.cutFromTopToDown(candidates, wrongTopFDs)
 
     // find the minimal fds in the middle levels
-    if (newColSize <= 10)
+/*    if (newColSize <= 10)
       findByDF(newDF, newColSize)
     else
-      findByDFandRDD(newDF, newColSize)
-      //findByDfAndRdd(newDF, newColSize)
+      findByDFandRDD(newDF, newColSize)*/
+
+    findByDFandRDD(newDF, newColSize)
 
     // check the top levels
     if (topFDs.nonEmpty) {

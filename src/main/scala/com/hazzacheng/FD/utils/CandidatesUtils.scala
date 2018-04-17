@@ -150,7 +150,7 @@ object CandidatesUtils {
     }
   }
 
-  def getCutted(candidates: mutable.HashMap[Set[Int], mutable.Set[Int]],
+/*  def getCutted(candidates: mutable.HashMap[Set[Int], mutable.Set[Int]],
                 fd: (Set[Int], Int)): mutable.HashSet[(Set[Int], Int)] = {
     val res = mutable.HashSet.empty[(Set[Int], Int)]
 
@@ -158,9 +158,20 @@ object CandidatesUtils {
     res ++= getCuttedInCandidates(candidates, lhs, fd._2)
 
     res
+  }*/
+
+  def getCuttedNotDel(candidates: mutable.HashMap[Set[Int], mutable.Set[Int]],
+                fd: (Set[Int], Int)): mutable.HashSet[(Set[Int], Int)] = {
+    val res = mutable.HashSet.empty[(Set[Int], Int)]
+    val len = fd._1.size
+
+    val lhs = candidates.keys.filter(x => x.size == len + 1 && isSubSet(x, fd._1)).toList
+    res ++= getCuttedInCandidatesNotDel(candidates, lhs, fd._2)
+
+    res
   }
 
-  def getCuttedInCandidates(candidates: mutable.HashMap[Set[Int], mutable.Set[Int]],
+/*  def getCuttedInCandidates(candidates: mutable.HashMap[Set[Int], mutable.Set[Int]],
                             lhs: List[Set[Int]],
                             rhs: Int): List[(Set[Int], Int)]= {
     val cutted = mutable.ListBuffer.empty[(Set[Int], Int)]
@@ -178,6 +189,19 @@ object CandidatesUtils {
     }
 
     cutted.toList
+  }*/
+
+  def getCuttedInCandidatesNotDel(candidates: mutable.HashMap[Set[Int], mutable.Set[Int]],
+                            lhs: List[Set[Int]],
+                            rhs: Int): List[(Set[Int], Int)]= {
+    val cutted = mutable.ListBuffer.empty[(Set[Int], Int)]
+
+    for (l <- lhs) {
+      val value = candidates(l)
+      if (value contains rhs) cutted.append((l, rhs))
+    }
+
+    cutted.toList
   }
 
   def isSubSet(big: Set[Int], small: Set[Int]): Boolean = {
@@ -191,7 +215,7 @@ object CandidatesUtils {
                      ): mutable.HashMap[(Set[Int], Int), mutable.HashSet[(Set[Int], Int)]] = {
     val map = mutable.HashMap.empty[(Set[Int], Int), mutable.HashSet[(Set[Int], Int)]]
     failFDs.foreach{x =>
-      val cutted = getCutted(candidates, x)
+      val cutted = getCuttedNotDel(candidates, x)
       if (cutted.nonEmpty) {
         map.put(x, cutted)
       }
