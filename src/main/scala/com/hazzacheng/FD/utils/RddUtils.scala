@@ -124,7 +124,7 @@ object RddUtils {
     levelMapBV.unpersist()
     fdsBV.unpersist()
 
-    val rightFDs = fds.flatMap(x => x._2.map(y => (x._1, y))) -- failFDs
+    val rightFDs = fds.flatMap(x => x._2.map(y => (x._1, y))).toSet -- failFDs
     topFDs ++= rightFDs
 
     levelMap.clear()

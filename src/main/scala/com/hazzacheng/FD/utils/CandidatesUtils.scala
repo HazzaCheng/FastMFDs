@@ -44,6 +44,14 @@ object CandidatesUtils {
     subSets.toList
   }
 
+  def getToCheckedSize(toChecked: List[(Set[Int], mutable.Set[Int])]): Int = {
+    var sum = 0
+
+    toChecked.foreach(x => sum += x._2.size)
+
+    sum
+  }
+
   def getTargetCandidates(candidates: mutable.HashMap[Set[Int], mutable.Set[Int]],
                           common: Int,
                           level: Int): mutable.HashMap[Set[Int], mutable.Set[Int]] = {
