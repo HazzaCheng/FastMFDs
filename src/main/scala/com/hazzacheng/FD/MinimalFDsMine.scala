@@ -66,8 +66,8 @@ class MinimalFDsMine(private var numPartitions: Int,
     results ++= bottomFDs
     // get new df
     val newDF = DataFrameUtils.getSelectedDF(df, numPartitions, del.toSet).persist(StorageLevel.MEMORY_AND_DISK_SER)
-    df.unpersist()
     val newSize = newDF.count()
+    df.unpersist()
     println("====== New DF Count: " + newSize)
 
     // check the fds with the longest lhs
