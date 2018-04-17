@@ -107,6 +107,13 @@ object DataFrameUtils {
     temp
   }
 
+  def getNewDF(df: DataFrame, numPartitions:Int, del: Set[Int]): DataFrame = {
+    val cols = df.columns.zipWithIndex.filter(x => !del.contains(x._2 + 1)).map(_._1)
+    val newDF = df.select(cols.head, cols.tail: _*)
+
+    newDF
+  }
+
   def getSelectedDF(df: DataFrame, numPartitions:Int, del: Set[Int]): DataFrame = {
     val cols = df.columns.zipWithIndex.filter(x => !del.contains(x._2 + 1)).map(_._1)
     val newDF = df.select(cols.head, cols.tail: _*).distinct()//.repartition(numPartitions)

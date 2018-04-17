@@ -35,7 +35,6 @@ object RddUtils {
   def getMinimalFDs(sc: SparkContext,
                     partitionsRDD: RDD[(Int, List[Array[Int]])],
                     fds: List[(Set[Int], mutable.Set[Int])],
-                    res: mutable.ListBuffer[(Set[Int], Int)],
                     partitionSize: Int,
                     colSize: Int,
                     levelMap: mutable.HashMap[Int, mutable.HashSet[(Set[Int], Int)]]
@@ -52,7 +51,6 @@ object RddUtils {
     val candidates = duplicatesRDD.map(x => (x, 1)).reduceByKey(_ + _).collect()
     // TODO: local vs parallel
     val minimalFDs = candidates.filter(_._2 == partitionSize).map(_._1)
-    res ++= minimalFDs
 
     val failFDs = duplicatesRDD.collect().distinct.toSet -- minimalFDs
     val partWithFailFDs = tuplesRDD.collect()

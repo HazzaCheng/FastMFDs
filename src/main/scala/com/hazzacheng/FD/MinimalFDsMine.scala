@@ -42,7 +42,7 @@ class MinimalFDsMine(private var numPartitions: Int,
   val rhsCount = mutable.Map.empty[Int, Int]
   val rdds = mutable.Map.empty[Int, RDD[(Int, List[Array[Int]])]]
   val rddsCountMap = mutable.Map.empty[Int, Int]
-  val THRESHOLD = 50
+  val THRESHOLD = 15
 
   def setNumPartitions(numPartitions: Int): this.type = {
     this.numPartitions = numPartitions
@@ -65,7 +65,7 @@ class MinimalFDsMine(private var numPartitions: Int,
     val bottomFDs = getNewBottomFDs(withoutEqualAttr)
     results ++= bottomFDs
     // get new df
-    val newDF = DataFrameUtils.getSelectedDF(df, numPartitions, del.toSet).persist(StorageLevel.MEMORY_AND_DISK_SER)
+    val newDF = DataFrameUtils.getNewDF(df, numPartitions, del.toSet).persist(StorageLevel.MEMORY_AND_DISK_SER)
     val newSize = newDF.count()
     df.unpersist()
     println("====== New DF Count: " + newSize)
@@ -83,7 +83,7 @@ class MinimalFDsMine(private var numPartitions: Int,
 
     // find the minimal fds in the middle levels
     if (newColSize <= 10)
-      findByDf(newDF, newColSize)
+      findByDF(newDF, newColSize)
     else
       findByDFandRDD(newDF, newColSize)
       //findByDfAndRdd(newDF, newColSize)
@@ -100,7 +100,7 @@ class MinimalFDsMine(private var numPartitions: Int,
     fds
   }
 
-  private def findByDf(newDF: DataFrame,
+  private def findByDF(newDF: DataFrame,
                        newColSize: Int
                        //orders:  Array[(Int, Int)]
                       ): Unit = {
@@ -108,7 +108,7 @@ class MinimalFDsMine(private var numPartitions: Int,
     for (level <- 2 to middle) {
       // the higher level
       val symmetrical = newColSize - level
-      if (level != symmetrical) {
+      if (level < symmetrical) {
         val time0 = System.currentTimeMillis()
         val toCheckedHigh = CandidatesUtils.getLevelCandidates(candidates, symmetrical).toList
         println("====df toCheckedHigh: " + "level- " + symmetrical + " " + " lhs: " + toCheckedHigh.toList.length + " whole: " + toCheckedHigh.toList.flatMap(x => x._2.toList).size)
@@ -136,7 +136,7 @@ class MinimalFDsMine(private var numPartitions: Int,
 
   }
 
-  private def findByDfAndRdd(newDF: DataFrame,
+ /* private def findByDfAndRdd(newDF: DataFrame,
                              newColSize: Int
                             ): Unit = {
 
@@ -154,7 +154,7 @@ class MinimalFDsMine(private var numPartitions: Int,
     for (level <- 2 to middle) {
       // the higher level
       val symmetrical = newColSize - level
-      if (level != symmetrical) {
+      if (level < symmetrical) {
         val time0 = System.currentTimeMillis()
         val toCheckedHigh = CandidatesUtils.getLevelCandidates(candidates, symmetrical).toList
         println("====toCheckedHigh: " + "level- " + symmetrical + " " + " lhs: " + toCheckedHigh.toList.length + " whole: " + toCheckedHigh.toList.flatMap(x => x._2.toList).size)
@@ -190,7 +190,7 @@ class MinimalFDsMine(private var numPartitions: Int,
       println("====toCheckedLow time: " + "level- " + level + " " + (System.currentTimeMillis() - time_))
     }
 
-  }
+  }*/
 
   def findBySplit(newDF: DataFrame,
                   newColSize: Int
@@ -244,7 +244,7 @@ class MinimalFDsMine(private var numPartitions: Int,
 
         // the higher level
         val high = cols - low
-        if (low != high) {
+        if (low < high) {
           val t = System.currentTimeMillis()
 
           val toCheckedHigh = CandidatesUtils.getTargetCandidates(candidates, col, high).toList
@@ -258,8 +258,8 @@ class MinimalFDsMine(private var numPartitions: Int,
             val failFDs = RddUtils.getFailFDs(sc, rdd, toCheckedHigh, cols, topFDs, levelMap)
             CandidatesUtils.cutFromTopToDown(candidates, failFDs)
           }
-
-          println("====== High Level: " + high + " Col: " + col + " Size: " + size + " Time: " + (System.currentTimeMillis() - t))
+          if (size > 0)
+            println("====== High Level: " + high + " Col: " + col + " Size: " + size + " Time: " + (System.currentTimeMillis() - t))
         }
 
         // the lower level
@@ -276,7 +276,8 @@ class MinimalFDsMine(private var numPartitions: Int,
           val rdd = rdds.getOrElseUpdate(col, repart(RDD, col).persist(StorageLevel.MEMORY_AND_DISK))
           val partitionSize = rddsCountMap.getOrElseUpdate(col, rdd.count().toInt)
           val (minimalFDs, failFDs, partWithFailFDs) =
-            RddUtils.getMinimalFDs(sc, rdd, toCheckedLow, results, partitionSize, cols, wholeCuttedMap)
+            RddUtils.getMinimalFDs(sc, rdd, toCheckedLow, partitionSize, cols, wholeCuttedMap)
+          results ++= minimalFDs
           CandidatesUtils.cutFromDownToTop(candidates, minimalFDs)
           CandidatesUtils.cutInTopLevels(topFDs, minimalFDs)
           if (failFDs.nonEmpty) {
@@ -284,7 +285,8 @@ class MinimalFDsMine(private var numPartitions: Int,
             RddUtils.updateLevelMap(cuttedFDsMap, partWithFailFDs, wholeCuttedMap, low)
           }
         }
-        println("====== Low Level: " + high + " Col: " + col + " Size: " + size + " Time: " + (System.currentTimeMillis() - t))
+        if (size > 0)
+          println("====== Low Level: " + high + " Col: " + col + " Size: " + size + " Time: " + (System.currentTimeMillis() - t))
 
       }
     }
@@ -303,7 +305,7 @@ class MinimalFDsMine(private var numPartitions: Int,
 
         // the higher level
         val high = cols - low
-        if (low != high) {
+        if (low < high) {
           val t = System.currentTimeMillis()
 
           val toCheckedHigh = CandidatesUtils.getTargetCandidates(candidates, col, high, colsSet).toList
@@ -317,8 +319,8 @@ class MinimalFDsMine(private var numPartitions: Int,
             val failFDs = RddUtils.getFailFDs(sc, rdd, toCheckedHigh, cols, topFDs, levelMap)
             CandidatesUtils.cutFromTopToDown(candidates, failFDs)
           }
-
-          println("====== High Level: " + high + " Col: " + col + " Offset: " + offset + " Size: " + size + " Time: " + (System.currentTimeMillis() - t))
+          if (size > 0)
+            println("====== High Level: " + high + " Col: " + col + " Offset: " + offset + " Size: " + size + " Time: " + (System.currentTimeMillis() - t))
         }
 
         // the lower level
@@ -335,7 +337,8 @@ class MinimalFDsMine(private var numPartitions: Int,
           val rdd = rdds.getOrElseUpdate(col, repart(RDD, col).persist(StorageLevel.MEMORY_AND_DISK))
           val partitionSize = rddsCountMap.getOrElseUpdate(col, rdd.count().toInt)
           val (minimalFDs, failFDs, partWithFailFDs) =
-            RddUtils.getMinimalFDs(sc, rdd, toCheckedLow, results, partitionSize, cols, wholeCuttedMap)
+            RddUtils.getMinimalFDs(sc, rdd, toCheckedLow, partitionSize, cols, wholeCuttedMap)
+          results ++= minimalFDs
           CandidatesUtils.cutFromDownToTop(candidates, minimalFDs)
           CandidatesUtils.cutInTopLevels(topFDs, minimalFDs)
           if (failFDs.nonEmpty) {
@@ -343,7 +346,8 @@ class MinimalFDsMine(private var numPartitions: Int,
             RddUtils.updateLevelMap(cuttedFDsMap, partWithFailFDs, wholeCuttedMap, low)
           }
         }
-        println("====== Low Level: " + high + " Col: " + col + " Offset: " + offset + " Size: " + size + " Time: " + (System.currentTimeMillis() - t))
+        if (size > 0)
+          println("====== Low Level: " + high + " Col: " + col + " Offset: " + offset + " Size: " + size + " Time: " + (System.currentTimeMillis() - t))
 
       }
     }
