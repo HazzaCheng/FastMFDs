@@ -91,7 +91,7 @@ object RddUtils {
     }
 
     partition.foreach(line => {
-      val left = takeAttrLHS(line, lhs)
+      val left = takeAttrs(line, lhs)
       val right = takeAttrRHS(line, true_rhs, colSize)
       val value = dict.getOrElse(left, null)
       if (value != null) {
@@ -152,16 +152,16 @@ object RddUtils {
               rhs: mutable.Set[Int],
               colSize: Int): (List[(Set[Int], Int)], (Set[Int], Int)) = {
     val (existRhs, nonExistRhs) = rhs.partition(r => levelMap.contains(lhs + r))
-    val lhsCount = partition.map(p => (takeAttrLHS(p, lhs), 1)).groupBy(_._1).size
-    val nonExistRhsCount = nonExistRhs.map(r => (r, partition.map(p => (takeAttrLHS(p, lhs + r), 1)).groupBy(_._1).size))
+    val lhsCount = partition.map(p => (takeAttrs(p, lhs), 1)).groupBy(_._1).size
+    val nonExistRhsCount = nonExistRhs.map(r => (r, partition.map(p => (takeAttrs(p, lhs + r), 1)).groupBy(_._1).size))
     val existRhsCount = existRhs.map(x => (x, levelMap(lhs + x)))
     val wrong = (nonExistRhsCount ++ existRhsCount).filter(r => r._2 != lhsCount).map(x => (lhs, x._1))
-    nonExistRhsCount.foreach(r => levelMap.put(lhs + r._1, r._2))
+    //nonExistRhsCount.foreach(r => levelMap.put(lhs + r._1, r._2))
 
     (wrong.toList, (lhs, lhsCount))
   }
 
-  private def takeAttrLHS(arr: Array[Int],
+  private def takeAttrs(arr: Array[Int],
                           attributes: Set[Int]): Int = {
     val s = mutable.StringBuilder.newBuilder
     attributes.toList.foreach(attr => s.append(arr(attr - 1) + " "))
@@ -174,6 +174,7 @@ object RddUtils {
                           colSize: Int): Array[Int] = {
     val res = new Array[Int](colSize + 1)
     attributes.toList.foreach(attr => res(attr) = arr(attr - 1))
+
     res
   }
 

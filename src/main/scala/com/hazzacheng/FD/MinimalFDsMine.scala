@@ -284,12 +284,12 @@ class MinimalFDsMine(private var numPartitions: Int,
           results ++= minimalFDs
           CandidatesUtils.cutFromDownToTop(candidates, minimalFDs)
           CandidatesUtils.cutInTopLevels(topFDs, minimalFDs)
-          if (failFDs.nonEmpty) {
+          /*if (failFDs.nonEmpty) {
             val cuttedFDsMap = CandidatesUtils.getCuttedFDsMap(candidates, failFDs)
             val map = wholeCuttedMap(col)
             RddUtils.updateLevelMap(cuttedFDsMap, partWithFailFDs, map, low)
             wholeCuttedMap.update(col, map)
-          }
+          }*/
         }
         if (size > 0)
           println("====== Low Level: " + high + " Col: " + col + " Size: " + size + " Time: " + (System.currentTimeMillis() - t))
