@@ -259,7 +259,7 @@ class MinimalFDsMine(private var numPartitions: Int,
             CandidatesUtils.cutFromTopToDown(candidates, failFDs)
           }
 
-          println(" High Level: " + high + " Col: " + col + " Size: " + size + " Time: " + (System.currentTimeMillis() - t))
+          println("====== High Level: " + high + " Col: " + col + " Size: " + size + " Time: " + (System.currentTimeMillis() - t))
         }
 
         // the lower level
@@ -284,7 +284,7 @@ class MinimalFDsMine(private var numPartitions: Int,
             RddUtils.updateLevelMap(cuttedFDsMap, partWithFailFDs, wholeCuttedMap, low)
           }
         }
-        println(" Low Level: " + high + " Col: " + col + " Size: " + size + " Time: " + (System.currentTimeMillis() - t))
+        println("====== Low Level: " + high + " Col: " + col + " Size: " + size + " Time: " + (System.currentTimeMillis() - t))
 
       }
     }
@@ -318,7 +318,7 @@ class MinimalFDsMine(private var numPartitions: Int,
             CandidatesUtils.cutFromTopToDown(candidates, failFDs)
           }
 
-          println(" High Level: " + high + " Col: " + col + " Offset: " + offset + " Size: " + size + " Time: " + (System.currentTimeMillis() - t))
+          println("====== High Level: " + high + " Col: " + col + " Offset: " + offset + " Size: " + size + " Time: " + (System.currentTimeMillis() - t))
         }
 
         // the lower level
@@ -343,7 +343,7 @@ class MinimalFDsMine(private var numPartitions: Int,
             RddUtils.updateLevelMap(cuttedFDsMap, partWithFailFDs, wholeCuttedMap, low)
           }
         }
-        println(" Low Level: " + high + " Col: " + col + " Offset: " + offset + " Size: " + size + " Time: " + (System.currentTimeMillis() - t))
+        println("====== Low Level: " + high + " Col: " + col + " Offset: " + offset + " Size: " + size + " Time: " + (System.currentTimeMillis() - t))
 
       }
     }
