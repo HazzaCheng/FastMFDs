@@ -2,7 +2,7 @@ package com.hazzacheng.FD.utils
 
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.types.{DataType, IntegerType, StructType}
-import org.apache.spark.sql.{DataFrame, Row, SQLContext, SparkSession}
+import org.apache.spark.sql.{DataFrame, Row, SparkSession}
 import org.apache.spark.storage.StorageLevel
 
 import scala.collection.mutable
@@ -46,6 +46,7 @@ object DataFrameUtils {
   }*/
 
   def getDataFrameFromCSV(ss: SparkSession,
+                          numPartitions: Int,
                           filePath: String,
                           tmpFilePath: String
                          ): (DataFrame, Int, String) = {
@@ -57,27 +58,34 @@ object DataFrameUtils {
 
     val time = System.currentTimeMillis()
     val rdd = sc.textFile(filePath).distinct().persist()
-    val colSize = rdd.first().split(",").length
+//    val colSize = rdd.first().split(",").length
     val words = rdd.flatMap(_.split(",")).distinct().zipWithIndex().collect()
       .sortBy(_._2).map(x => (x._1, x._2.toInt))
     println("===== Words: " + words.length)
     val words2index = mutable.HashMap.empty[String, Int]
     words.foreach(x => words2index.put(x._1, x._2))
     val words2indexBV = sc.broadcast(words2index)
-    val rowRDD = rdd.map(x => Row.fromSeq(x.split(",").map(words2indexBV.value(_))))
+    rdd.map(x => x.split(",").map(words2indexBV.value(_)).mkString(",")).saveAsTextFile(temp)
+    /*val rowRDD = rdd.map(x => Row.fromSeq(x.split(",").map(words2indexBV.value(_))))
     val schema = createSchema(colSize)
     val df = castColumnTo(ss.createDataFrame(rowRDD, schema), IntegerType)
+      .repartition(numPartitions)
       .persist(StorageLevel.MEMORY_AND_DISK_SER)
-    if (df.first().length != colSize) println("====== WRONG!!!!")
+    if (df.first().length != colSize) println("====== WRONG!!!!")*/
     rdd.unpersist()
-    rowRDD.unpersist()
     println("===== Save File: " + (System.currentTimeMillis() - time) + "ms")
+
+//    val df = castColumnTo(ss.read.csv(temp), IntegerType).persist(StorageLevel.MEMORY_AND_DISK_SER)
+    val df = ss.read.csv(temp).persist(StorageLevel.MEMORY_AND_DISK_SER)
+
+    val colSize = df.first.length
 
     (df, colSize, temp)
   }
 
   def dfToRdd(df: DataFrame): RDD[Array[Int]] = {
-    val rdd = df.rdd.map(r => r.toSeq.toArray.map(_.asInstanceOf[Int]))
+    val len = df.columns.length
+    val rdd = df.rdd.map(r => Range(0, len).map(r.getString(_).toInt).toArray)
 
     rdd
   }
@@ -99,19 +107,9 @@ object DataFrameUtils {
     temp
   }
 
-  def getColSize(df: DataFrame): Int = {
-    val colSize = df.first.length
-
-    colSize
-  }
-
-  def getRowSize(df: DataFrame): Long = {
-    df.count()
-  }
-
-  def getNewDF(df: DataFrame, del: Set[Int]): DataFrame = {
+  def getSelectedDF(df: DataFrame, numPartitions:Int, del: Set[Int]): DataFrame = {
     val cols = df.columns.zipWithIndex.filter(x => !del.contains(x._2 + 1)).map(_._1)
-    val newDF = df.select(cols.head, cols.tail: _*)//.repartition()
+    val newDF = df.select(cols.head, cols.tail: _*)//.repartition(numPartitions)
 
     newDF
   }
@@ -173,7 +171,7 @@ object DataFrameUtils {
   def getTopFDs(moreAttrsCountMap: mutable.HashMap[Set[Int], Int],
                 df: DataFrame,
                 topCandidates: mutable.Set[(Set[Int], Int)],
-                rhsCount: Map[Int, Int]
+                rhsCount: mutable.Map[Int, Int]
                ): (mutable.Set[(Set[Int], Int)], Array[(Set[Int], Int)]) = {
     val cols = df.columns
 
@@ -202,48 +200,57 @@ object DataFrameUtils {
   }
 
   def getMinimalFDs(df: DataFrame,
-                    toChecked: mutable.HashMap[Set[Int], mutable.Set[Int]],
+                    toChecked: List[(Set[Int], mutable.Set[Int])],
                     lessAttrsCountMap: mutable.HashMap[Set[Int], Int],
-                    rhsCount: Map[Int, Int]
+                    lessBiggerAttrsCountMap: mutable.HashMap[Set[Int], Int],
+                    rhsCount: mutable.Map[Int, Int]
                    ): Array[(Set[Int], Int)] = {
-    val biggerMap = mutable.HashMap.empty[Set[Int], Int]
-    val fds = toChecked.toList.flatMap(x => x._2.map((x._1, _))).toArray
+    val fds = toChecked.flatMap(x => x._2.map((x._1, _))).toArray
+
+    if (lessBiggerAttrsCountMap.nonEmpty
+      && fds.last._1.size == lessBiggerAttrsCountMap.last._1.size) {
+      lessAttrsCountMap.clear()
+      lessAttrsCountMap ++= lessBiggerAttrsCountMap
+      lessBiggerAttrsCountMap.clear()
+    }
+
     val minimalFDs = fds.filter{fd =>
       val lhs = lessAttrsCountMap.getOrElseUpdate(fd._1, getAttrsCount(df, fd._1))
       if (lhs >= rhsCount(fd._2)) {
-        val whole = biggerMap.getOrElseUpdate(fd._1 + fd._2, getAttrsCount(df, fd._1 + fd._2))
+        val whole = lessBiggerAttrsCountMap.getOrElseUpdate(fd._1 + fd._2, getAttrsCount(df, fd._1 + fd._2))
         lhs == whole
       } else false
     }
-
-    lessAttrsCountMap.clear()
-    lessAttrsCountMap ++= biggerMap
 
     minimalFDs
   }
 
   def getFailFDs(df: DataFrame,
-                 toChecked: mutable.HashMap[Set[Int], mutable.Set[Int]],
+                 toChecked: List[(Set[Int], mutable.Set[Int])],
                  moreAttrsCountMap: mutable.HashMap[Set[Int], Int],
+                 moreSmallerAttrsCountMap: mutable.HashMap[Set[Int], Int],
                  topFDs: mutable.Set[(Set[Int], Int)],
-                 rhsCount: Map[Int, Int]
+                 rhsCount: mutable.Map[Int, Int]
                 ): Array[(Set[Int], Int)] = {
-    val smallerMap = mutable.HashMap.empty[Set[Int], Int]
     val fds = toChecked.flatMap(x => x._2.map((x._1, _))).toArray
+
+    if (moreSmallerAttrsCountMap.nonEmpty
+      && fds.last._1.size + 1 == moreSmallerAttrsCountMap.last._1.size) {
+      moreAttrsCountMap.clear()
+      moreAttrsCountMap ++= moreSmallerAttrsCountMap
+      moreSmallerAttrsCountMap.clear()
+    }
 
     val failFDs = fds.filter{fd =>
       val whole = moreAttrsCountMap.getOrElseUpdate(fd._1 + fd._2, getAttrsCount(df, fd._1 + fd._2))
       if (whole >= rhsCount(fd._2)) {
-        val lhs = smallerMap.getOrElseUpdate(fd._1, getAttrsCount(df, fd._1))
+        val lhs = moreSmallerAttrsCountMap.getOrElseUpdate(fd._1, getAttrsCount(df, fd._1))
         lhs != whole
       } else true
     }
 
     val rightFDs = fds.toSet -- failFDs
     topFDs ++= rightFDs
-
-    moreAttrsCountMap.clear()
-    moreAttrsCountMap ++= smallerMap
 
     failFDs
   }

@@ -112,6 +112,7 @@ object RddUtils {
                  partitionsRDD: RDD[(Int, List[Array[Int]])],
                  fds: List[(Set[Int], mutable.Set[Int])],
                  colSize: Int,
+                 topFDs: mutable.Set[(Set[Int], Int)],
                  levelMap: mutable.HashMap[Int, mutable.HashMap[Set[Int], Int]]
                 ): Array[(Set[Int], Int)] = {
     val fdsBV = sc.broadcast(fds)
@@ -122,6 +123,9 @@ object RddUtils {
 
     levelMapBV.unpersist()
     fdsBV.unpersist()
+
+    val rightFDs = fds.flatMap(x => x._2.map(y => (x._1, y))) -- failFDs
+    topFDs ++= rightFDs
 
     levelMap.clear()
     counts.foreach{x =>
@@ -139,9 +143,9 @@ object RddUtils {
                                          colSize: Int
                                         ): (Int,  List[(List[(Set[Int], Int)], (Set[Int], Int))]) = {
     val levelMap = levelMapBV.value.getOrElse(partition._1, mutable.HashMap.empty[Set[Int], Int])
-    val minimalFDs = fdsBV.value.map(fd => checkFD(partition._2, levelMap, fd._1, fd._2, colSize))
+    val wrongFDs = fdsBV.value.map(fd => checkFD(partition._2, levelMap, fd._1, fd._2, colSize))
 
-    (partition._1, minimalFDs)
+    (partition._1, wrongFDs)
   }
 
   def checkFD(partition: List[Array[Int]],

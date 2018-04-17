@@ -17,19 +17,21 @@ object Main {
 
   def main(args: Array[String]): Unit = {
     val conf = new SparkConf()
-      .set("spark.default.parallelism", "500")
+      .set("spark.default.parallelism", "250")
       .set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
       .set("spark.rdd.compress", "true")
 //      .set("spark.speculation", "true")
 
     val ss = SparkSession.builder().config(conf).getOrCreate()
     val sc = ss.sparkContext
+    val numPartitions = sc.defaultParallelism
+
     val input = args(0)
     val output = args(1)
     val temp = args(2)
-    val (df, colSize, tempFilePath) = utils.DataFrameUtils.getDataFrameFromCSV(ss, input, temp)
-//    val colSize = utils.DataFrameUtils.getColSize(df)
-    val fds = MinimalFDsMine.findOnSpark(sc, df, colSize, tempFilePath)
+
+    val (df, colSize, tempFilePath) = utils.DataFrameUtils.getDataFrameFromCSV(ss, numPartitions, input, temp)
+    val fds = new MinimalFDsMine(numPartitions, sc, df, colSize, tempFilePath).run()
     val res = RddUtils.outPutFormat(fds)
 
     sc.parallelize(res).saveAsTextFile(output)

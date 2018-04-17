@@ -59,6 +59,24 @@ object CandidatesUtils {
     res
   }
 
+  def getTargetCandidates(candidates: mutable.HashMap[Set[Int], mutable.Set[Int]],
+                          common: Int,
+                          level: Int,
+                          cols: Set[Int]): mutable.HashMap[Set[Int], mutable.Set[Int]] = {
+    val res = mutable.HashMap.empty[Set[Int], mutable.Set[Int]]
+
+    for (key <- candidates.keys) {
+      if (key.size == level && key.contains(common) && key.exists(!cols.contains(_))) {
+        val vals = candidates(key).partition(cols.contains)
+        res.put(key, vals._1)
+        if (vals._2.isEmpty) candidates.remove(key)
+        else candidates.update(key, vals._2)
+      }
+    }
+
+    res
+  }
+
   def getLevelCandidates(candidates: mutable.HashMap[Set[Int], mutable.Set[Int]],
                          level: Int): mutable.HashMap[Set[Int], mutable.Set[Int]] = {
     val res = mutable.HashMap.empty[Set[Int], mutable.Set[Int]]
