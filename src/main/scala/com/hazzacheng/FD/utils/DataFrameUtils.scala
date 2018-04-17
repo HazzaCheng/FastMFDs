@@ -2,7 +2,7 @@ package com.hazzacheng.FD.utils
 
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.types.{DataType, IntegerType, StructType}
-import org.apache.spark.sql.{DataFrame, Row, SparkSession}
+import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.storage.StorageLevel
 
 import scala.collection.mutable

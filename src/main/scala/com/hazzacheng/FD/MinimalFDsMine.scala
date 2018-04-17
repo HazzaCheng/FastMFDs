@@ -31,8 +31,8 @@ class MinimalFDsMine(private var numPartitions: Int,
   val lessBiggerAttrsCountMap = mutable.HashMap.empty[Set[Int], Int]
   val moreAttrsCountMap = mutable.HashMap.empty[Set[Int], Int]
   val moreSmallerAttrsCountMap = mutable.HashMap.empty[Set[Int], Int]
-  val levelMap = mutable.HashMap.empty[Int, mutable.HashMap[Set[Int], Int]]
-  val wholeCuttedMap = mutable.HashMap.empty[Int, mutable.HashSet[(Set[Int], Int)]]
+  val levelMap = mutable.Map.empty[Int, mutable.HashMap[Int, mutable.HashMap[Set[Int], Int]]]
+  val wholeCuttedMap = mutable.Map.empty[Int, mutable.HashMap[Int, mutable.HashSet[(Set[Int], Int)]]]
   val candidates = mutable.HashMap.empty[Set[Int], mutable.Set[Int]]
   val topCandidates = mutable.Set.empty[(Set[Int], Int)]
   val topFDs = mutable.Set.empty[(Set[Int], Int)]
@@ -42,7 +42,7 @@ class MinimalFDsMine(private var numPartitions: Int,
   val rhsCount = mutable.Map.empty[Int, Int]
   val rdds = mutable.Map.empty[Int, RDD[(Int, List[Array[Int]])]]
   val rddsCountMap = mutable.Map.empty[Int, Int]
-  val THRESHOLD = 15
+  val THRESHOLD = 20
 
   def setNumPartitions(numPartitions: Int): this.type = {
     this.numPartitions = numPartitions
@@ -255,7 +255,9 @@ class MinimalFDsMine(private var numPartitions: Int,
           }
           if (size > THRESHOLD) {
             val rdd = rdds.getOrElseUpdate(col, repart(RDD, col).persist(StorageLevel.MEMORY_AND_DISK))
-            val failFDs = RddUtils.getFailFDs(sc, rdd, toCheckedHigh, cols, topFDs, levelMap)
+            val map = levelMap.getOrElseUpdate(col, mutable.HashMap.empty[Int, mutable.HashMap[Set[Int], Int]])
+            val failFDs = RddUtils.getFailFDs(sc, rdd, toCheckedHigh, cols, topFDs, map)
+            levelMap.update(col, map)
             CandidatesUtils.cutFromTopToDown(candidates, failFDs)
           }
           if (size > 0)
@@ -264,7 +266,7 @@ class MinimalFDsMine(private var numPartitions: Int,
 
         // the lower level
         val t = System.currentTimeMillis()
-        val toCheckedLow = CandidatesUtils.getTargetCandidates(candidates, col, high).toList
+        val toCheckedLow = CandidatesUtils.getTargetCandidates(candidates, col, low).toList
         val size = CandidatesUtils.getToCheckedSize(toCheckedLow)
         if (size > 0 && size <= THRESHOLD) {
           val minimalFds = DataFrameUtils.getMinimalFDs(df, toCheckedLow, lessAttrsCountMap, lessBiggerAttrsCountMap, rhsCount)
@@ -275,14 +277,17 @@ class MinimalFDsMine(private var numPartitions: Int,
         if (size > THRESHOLD) {
           val rdd = rdds.getOrElseUpdate(col, repart(RDD, col).persist(StorageLevel.MEMORY_AND_DISK))
           val partitionSize = rddsCountMap.getOrElseUpdate(col, rdd.count().toInt)
+          val map = wholeCuttedMap.getOrElseUpdate(col, mutable.HashMap.empty[Int, mutable.HashSet[(Set[Int], Int)]])
           val (minimalFDs, failFDs, partWithFailFDs) =
-            RddUtils.getMinimalFDs(sc, rdd, toCheckedLow, partitionSize, cols, wholeCuttedMap)
+            RddUtils.getMinimalFDs(sc, rdd, toCheckedLow, partitionSize, cols, map)
           results ++= minimalFDs
           CandidatesUtils.cutFromDownToTop(candidates, minimalFDs)
           CandidatesUtils.cutInTopLevels(topFDs, minimalFDs)
           if (failFDs.nonEmpty) {
             val cuttedFDsMap = CandidatesUtils.getCuttedFDsMap(candidates, failFDs)
-            RddUtils.updateLevelMap(cuttedFDsMap, partWithFailFDs, wholeCuttedMap, low)
+            val map = wholeCuttedMap(col)
+            RddUtils.updateLevelMap(cuttedFDsMap, partWithFailFDs, map, low)
+            wholeCuttedMap.update(col, map)
           }
         }
         if (size > 0)
@@ -316,7 +321,9 @@ class MinimalFDsMine(private var numPartitions: Int,
           }
           if (size > THRESHOLD) {
             val rdd = rdds.getOrElseUpdate(col, repart(RDD, col).persist(StorageLevel.MEMORY_AND_DISK))
-            val failFDs = RddUtils.getFailFDs(sc, rdd, toCheckedHigh, cols, topFDs, levelMap)
+            val map = levelMap.getOrElseUpdate(col, mutable.HashMap.empty[Int, mutable.HashMap[Set[Int], Int]])
+            val failFDs = RddUtils.getFailFDs(sc, rdd, toCheckedHigh, cols, topFDs, map)
+            levelMap.update(col, map)
             CandidatesUtils.cutFromTopToDown(candidates, failFDs)
           }
           if (size > 0)
@@ -336,14 +343,17 @@ class MinimalFDsMine(private var numPartitions: Int,
         if (size > THRESHOLD) {
           val rdd = rdds.getOrElseUpdate(col, repart(RDD, col).persist(StorageLevel.MEMORY_AND_DISK))
           val partitionSize = rddsCountMap.getOrElseUpdate(col, rdd.count().toInt)
+          val map = wholeCuttedMap.getOrElseUpdate(col, mutable.HashMap.empty[Int, mutable.HashSet[(Set[Int], Int)]])
           val (minimalFDs, failFDs, partWithFailFDs) =
-            RddUtils.getMinimalFDs(sc, rdd, toCheckedLow, partitionSize, cols, wholeCuttedMap)
+            RddUtils.getMinimalFDs(sc, rdd, toCheckedLow, partitionSize, cols, map)
           results ++= minimalFDs
           CandidatesUtils.cutFromDownToTop(candidates, minimalFDs)
           CandidatesUtils.cutInTopLevels(topFDs, minimalFDs)
           if (failFDs.nonEmpty) {
             val cuttedFDsMap = CandidatesUtils.getCuttedFDsMap(candidates, failFDs)
-            RddUtils.updateLevelMap(cuttedFDsMap, partWithFailFDs, wholeCuttedMap, low)
+            val map = wholeCuttedMap(col)
+            RddUtils.updateLevelMap(cuttedFDsMap, partWithFailFDs, map, low)
+            wholeCuttedMap.update(col, map)
           }
         }
         if (size > 0)
