@@ -164,8 +164,13 @@ object RddUtils {
   private def takeAttrs(arr: Array[Int],
                           attributes: Set[Int]): Int = {
     val s = mutable.StringBuilder.newBuilder
-    attributes.toList.foreach(attr => s.append(arr(attr - 1) + " "))
 
+    attributes.toList.foreach{attr =>
+      val a = arr(attr - 1)
+      s.append(a + " ")
+    }
+
+//    hash(s.toString())
     s.toString().hashCode
   }
 
@@ -194,6 +199,45 @@ object RddUtils {
 
       levelMap.update(x._1, cutted)
     }
+  }
+
+  def FNVHash1(data: String): Int = {
+    val p = 16777619
+    var hash = 2166136261L.toInt
+
+    val datas = data.toCharArray
+    val len = datas.length
+
+    for (i <- 0 until len)
+      hash = (hash ^ datas(i)) * p
+
+    hash += hash << 13
+    hash ^= hash >> 7
+    hash += hash << 3
+    hash ^= hash >> 17
+    hash += hash << 5
+
+    hash
+  }
+
+
+  def mixHash(str: String): Long = {
+    var hash = str.hashCode
+    hash <<= 32
+    hash |= FNVHash1(str)
+    hash
+  }
+
+  def hash(str: String): Long = {
+    var h = 1125899906842597L
+    val chars = str.toCharArray
+    val len = chars.length
+
+    for (i <- 0 until len) {
+      h = 31 * h + chars(i)
+    }
+
+    h
   }
 
 

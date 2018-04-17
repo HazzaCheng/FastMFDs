@@ -30,7 +30,7 @@ object Main {
     val output = args(1)
     val temp = args(2)
 
-    val (df, colSize, tempFilePath) = utils.DataFrameUtils.getDataFrameFromCSV(ss, numPartitions, input, temp)
+    val (df, colSize, tempFilePath, index2word) = utils.DataFrameUtils.getDataFrameFromCSV(ss, numPartitions, input, temp)
     val fds = new MinimalFDsMine(numPartitions, sc, df, colSize, tempFilePath).run()
     val res = RddUtils.outPutFormat(fds)
 
