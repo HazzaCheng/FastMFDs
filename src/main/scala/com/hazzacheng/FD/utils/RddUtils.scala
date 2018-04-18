@@ -81,7 +81,7 @@ object RddUtils {
 
     val true_rhs = rhs.clone()
     val tmp = mutable.Set.empty[Int]
-    val dict = mutable.HashMap.empty[Int, Array[Int]]
+    val dict = mutable.HashMap.empty[String, Array[Int]]
 
     rhs.foreach{r =>
       if (levelMap contains (lhs, r)) {
@@ -162,7 +162,7 @@ object RddUtils {
   }
 
   private def takeAttrs(arr: Array[Int],
-                          attributes: Set[Int]): Int = {
+                          attributes: Set[Int]): String = {
     val s = mutable.StringBuilder.newBuilder
 
     attributes.toList.foreach{attr =>
@@ -170,8 +170,7 @@ object RddUtils {
       s.append(a + " ")
     }
 
-//    hash(s.toString())
-    s.toString().hashCode
+    s.toString()//.hashCode
   }
 
   private def takeAttrRHS(arr: Array[Int],

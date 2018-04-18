@@ -21,7 +21,7 @@ object DataFrameUtils {
                           numPartitions: Int,
                           filePath: String,
                           tmpFilePath: String
-                         ): (DataFrame, Int, String, mutable.HashMap[Int, String]) = {
+                         ): (DataFrame, Int, String) = {
     val sc = ss.sparkContext
 
     var temp = tmpFilePath
@@ -30,14 +30,12 @@ object DataFrameUtils {
 
     val time = System.currentTimeMillis()
     val rdd = sc.textFile(filePath).distinct().persist()
-    val words = rdd.flatMap(_.split(",")).distinct().zipWithIndex().collect()
-      .map(x => (x._1, x._2.toInt))
+    val words = rdd.flatMap(_.split(",")).distinct().zipWithIndex()
+      .collect().map(x => (x._1, x._2.toInt))
 //    val words = rdd.flatMap(_.split(",")).distinct().map(x => (x, x.hashCode)).collect()
     println("===== Words: " + words.length)
     val word2index = mutable.HashMap.empty[String, Int]
-    val index2word = mutable.HashMap.empty[Int, String]
     words.foreach(x => word2index.put(x._1, x._2))
-    words.foreach(x => index2word.put(x._2, x._1))
     val words2indexBV = sc.broadcast(word2index)
     rdd.map(x => x.split(",").map(words2indexBV.value(_)).mkString(",")).saveAsTextFile(temp)
 
@@ -48,7 +46,7 @@ object DataFrameUtils {
 
     val colSize = df.first.length
 
-    (df, colSize, temp, index2word)
+    (df, colSize, temp)
   }
 
   def dfToRdd(df: DataFrame): RDD[Array[Int]] = {
