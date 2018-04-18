@@ -6,6 +6,7 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.storage.StorageLevel
 
 import scala.collection.mutable
+import scala.collection.mutable.ListBuffer
 
 /**
   * Created with IntelliJ IDEA.
@@ -87,7 +88,7 @@ object DataFrameUtils {
     newDF
   }
 
-  private def getSingleLhsCount(df: DataFrame,
+  private def getSingleColCount(df: DataFrame,
                                 allSame: mutable.HashSet[Int]
                                ): Map[Int, Int] = {
     val (res, same) = df.columns.map(col => df.groupBy(col)
@@ -124,7 +125,7 @@ object DataFrameUtils {
                    colSize: Int,
                    allSame: mutable.HashSet[Int]
                   ): (Array[(Int, Int)], Map[Int, Int], List[((Int, Int), Int)]) = {
-    val lhs = getSingleLhsCount(df, allSame)
+    val lhs = getSingleColCount(df, allSame)
     val whole = getTwoAttributesCount(df, colSize, lhs, allSame)
     val map = whole.groupBy(_._2).map(x => (x._1, x._2.map(_._1)))
     val res = mutable.ListBuffer.empty[(Int, (Int, Int))]
@@ -139,6 +140,72 @@ object DataFrameUtils {
     val fds = res.toArray.map(x => if (x._1 == x._2._1) (x._1, x._2._2) else (x._1, x._2._1))
 
     (fds, lhs, whole)
+  }
+
+  def getDownFds(df: DataFrame,
+                 colSize: Int,
+                 allSame: mutable.HashSet[Int]
+                ): (Array[(Int, Int)], Map[Int, Int]) = {
+    val RDD = DataFrameUtils.dfToRdd(df).persist(StorageLevel.MEMORY_AND_DISK_SER)
+    val singleCount = getSingleColCount(df, allSame)
+
+    val tuples = mutable.ListBuffer.empty[((Int, Int), (String, String))]
+
+    val lists = mutable.ListBuffer.empty[(Int, ListBuffer[(Int, Int)])]
+    val equal = mutable.Set.empty[(Int, Int)]
+
+    for (i <- 1 to colSize if !allSame.contains(i)) {
+      val list = ListBuffer.empty[(Int, Int)]
+      for (j <- 1 to colSize if !allSame.contains(j) && i != j) {
+        if (singleCount(i) == singleCount(j)) {
+          if (!equal.contains((j, i))) equal.add((i, j))
+        }
+        if (singleCount(i) > singleCount(j)) list.append((i, j))
+      }
+      if (list.nonEmpty) lists.append((i, list))
+    }
+
+    val (r, f) = lists.partition(_._2.length > 8)
+
+    val columns = df.columns
+
+    val fds = mutable.ListBuffer.empty[(Int, Int)]
+
+    val r1 = equal.filter{x =>
+      val count = df.groupBy(columns(x._1 - 1), columns(x._2 - 1)).count().count().toInt
+
+      count == singleCount(x._1)
+    }
+    fds ++= r1.flatMap(x => List((x._1, x._2), (x._2, x._1))).toList
+
+    val r2 = f.flatMap{x => x._2.toList.filter(y =>
+      df.groupBy(columns(y._1 - 1), columns(y._2 - 1)).count().count().toInt == singleCount(x._1)
+    )}
+    fds ++= r2
+
+    val r3 = r.flatMap{t =>
+      val rdd = RDD.map(line => (line(t._1 - 1), List(line))).reduceByKey(_ ++ _)
+
+      val wrong = rdd.flatMap(p =>t._2.filter(x => check(p._2, x._2 - 1))).collect()
+      val fds = t._2.toSet -- wrong.distinct
+      /*val fds = t._2.filter{fd =>
+        !rdd.map(p => check(p._2, fd._2 - 1)).collect().contains(true)
+      }*/
+      rdd.unpersist()
+
+      fds
+    }
+    fds ++= r3
+
+    RDD.unpersist()
+
+    (fds.toArray, singleCount)
+  }
+
+  def check(p: List[Array[Int]], i: Int): Boolean = {
+    val target = p.last(i)
+
+    p.exists(x => x(i) != target)
   }
 
   def getTopFDs(moreAttrsCountMap: mutable.HashMap[Set[Int], Int],
@@ -164,6 +231,8 @@ object DataFrameUtils {
 
     (topFDs, wrong.toArray)
   }
+
+
 
   def getAttrsCount(df: DataFrame, attrs: Set[Int]): Int = {
     val cols = df.columns

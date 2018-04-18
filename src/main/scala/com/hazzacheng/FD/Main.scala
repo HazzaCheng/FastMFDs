@@ -1,8 +1,9 @@
 package com.hazzacheng.FD
 
-import com.hazzacheng.FD.utils.RddUtils
+import com.hazzacheng.FD.utils.{DataFrameUtils, RddUtils}
 import org.apache.spark.SparkConf
 import org.apache.spark.sql.SparkSession
+import org.apache.spark.storage.StorageLevel
 
 /**
   * Created with IntelliJ IDEA.

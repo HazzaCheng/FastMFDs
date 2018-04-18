@@ -3,6 +3,7 @@ package com.hazzacheng.FD.utils
 import org.apache.spark.SparkContext
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.DataFrame
 import org.apache.spark.storage.StorageLevel
 
 import scala.collection.mutable
@@ -30,6 +31,14 @@ object RddUtils {
   def outPutFormat(minFD: Map[Set[Int], List[Int]]): List[String] = {
     minFD.map(d => d._1.toList.sorted.map(x => "column" + x).mkString("[", ",", "]")
       + ":" + d._2.sorted.map(x => "column" + x).mkString(",")).toList
+  }
+
+  def repart(rdd: RDD[Array[Int]],
+                     attribute: Int): RDD[(Int, List[Array[Int]])] = {
+    val partitions = rdd.map(line => (line(attribute - 1), List(line)))
+      .reduceByKey(_ ++ _)
+
+    partitions
   }
 
   def getMinimalFDs(sc: SparkContext,
@@ -162,7 +171,7 @@ object RddUtils {
   }
 
   private def takeAttrs(arr: Array[Int],
-                          attributes: Set[Int]): String = {
+                        attributes: Set[Int]): String = {
     val s = mutable.StringBuilder.newBuilder
 
     attributes.toList.foreach{attr =>
@@ -200,44 +209,70 @@ object RddUtils {
     }
   }
 
-  def FNVHash1(data: String): Int = {
-    val p = 16777619
-    var hash = 2166136261L.toInt
+  def getTopFDs(df: DataFrame,
+                wholeRDD: RDD[Array[Int]],
+                rdds: mutable.Map[Int, RDD[(Int, List[Array[Int]])]],
+                topCandidates: mutable.Set[(Set[Int], Int)],
+                col: Int,
+                rhsCount: mutable.Map[Int, Int]
+               ): (mutable.Set[(Set[Int], Int)], Array[(Set[Int], Int)]) = {
 
-    val datas = data.toCharArray
-    val len = datas.length
+    val topFDs = mutable.Set.empty[(Set[Int], Int)]
+    val wrongFDs = mutable.ListBuffer.empty[(Set[Int], Int)]
 
-    for (i <- 0 until len)
-      hash = (hash ^ datas(i)) * p
+    val (r, f) = topCandidates.partition(_._2 != col)
 
-    hash += hash << 13
-    hash ^= hash >> 7
-    hash += hash << 3
-    hash ^= hash >> 17
-    hash += hash << 5
+    if (f.nonEmpty) {
+      val fd = f.head
+      val cols = df.columns
+      val lhs = fd._1.map(y => cols(y - 1)).toArray
+      val whole = df.groupBy(cols(fd._2 - 1), lhs: _*).count().count().toInt
+      if (whole >= rhsCount(fd._2)) {
+        val left = df.groupBy(lhs.head, lhs.tail: _*).count().count().toInt
 
-    hash
-  }
-
-
-  def mixHash(str: String): Long = {
-    var hash = str.hashCode
-    hash <<= 32
-    hash |= FNVHash1(str)
-    hash
-  }
-
-  def hash(str: String): Long = {
-    var h = 1125899906842597L
-    val chars = str.toCharArray
-    val len = chars.length
-
-    for (i <- 0 until len) {
-      h = 31 * h + chars(i)
+        if (whole == left) topFDs.add(fd)
+      } else wrongFDs.append(fd)
     }
 
-    h
+    if (r.nonEmpty) {
+      val rdd = rdds.getOrElseUpdate(col, RddUtils.repart(wholeRDD, col).persist(StorageLevel.MEMORY_AND_DISK))
+      val (right, wrong) = getFailFDs(rdd, r.toList)
+      topFDs ++= right
+      wrongFDs ++= wrong
+    }
+
+
+    (topFDs, wrongFDs.toArray)
   }
 
+  def getFailFDs(partitionsRDD: RDD[(Int, List[Array[Int]])],
+                 fds: List[(Set[Int], Int)]
+                ): (Set[(Set[Int], Int)], Array[(Set[Int], Int)]) = {
+    val tuples = partitionsRDD.flatMap(p => checkEachPartitionForWrong(fds, p)).collect()
+    val failFDs = tuples.distinct
+
+    val rightFDs = fds.toSet -- failFDs
+
+    (rightFDs, failFDs)
+  }
+
+  private def checkEachPartitionForWrong(fds: List[(Set[Int], Int)],
+                                         partition: (Int, List[Array[Int]])
+                                        ): List[(Set[Int], Int)] = {
+    val wrongFDs = fds.flatMap(fd => checkFD(partition._2, fd._1, fd._2))
+
+    wrongFDs
+  }
+
+  def checkFD(partition: List[Array[Int]],
+              lhs: Set[Int],
+              rhs: Int
+              ): List[(Set[Int], Int)] = {
+    val lhsCount = partition.map(p => (takeAttrs(p, lhs), 1)).groupBy(_._1).size
+    val rhsCount = partition.map(p => (takeAttrs(p, lhs + rhs), 1)).groupBy(_._1).size
+
+    if (lhsCount == rhsCount) List((lhs, rhs))
+    else List.empty[(Set[Int], Int)]
+  }
 
 }
