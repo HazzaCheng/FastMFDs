@@ -150,16 +150,6 @@ object CandidatesUtils {
     }
   }
 
-/*  def getCutted(candidates: mutable.HashMap[Set[Int], mutable.Set[Int]],
-                fd: (Set[Int], Int)): mutable.HashSet[(Set[Int], Int)] = {
-    val res = mutable.HashSet.empty[(Set[Int], Int)]
-
-    val lhs = candidates.keys.filter(x => isSubSet(fd._1, x)).toList
-    res ++= getCuttedInCandidates(candidates, lhs, fd._2)
-
-    res
-  }*/
-
   def getCuttedNotDel(candidates: mutable.HashMap[Set[Int], mutable.Set[Int]],
                 fd: (Set[Int], Int)): mutable.HashSet[(Set[Int], Int)] = {
     val res = mutable.HashSet.empty[(Set[Int], Int)]
@@ -170,26 +160,6 @@ object CandidatesUtils {
 
     res
   }
-
-/*  def getCuttedInCandidates(candidates: mutable.HashMap[Set[Int], mutable.Set[Int]],
-                            lhs: List[Set[Int]],
-                            rhs: Int): List[(Set[Int], Int)]= {
-    val cutted = mutable.ListBuffer.empty[(Set[Int], Int)]
-
-    for (l <- lhs) {
-      val value = candidates(l)
-      if (value contains rhs) {
-        cutted.append((l, rhs))
-        if (value.size == 1) candidates.remove(l)
-        else {
-          value.remove(rhs)
-          candidates.update(l, value)
-        }
-      }
-    }
-
-    cutted.toList
-  }*/
 
   def getCuttedInCandidatesNotDel(candidates: mutable.HashMap[Set[Int], mutable.Set[Int]],
                             lhs: List[Set[Int]],
@@ -237,5 +207,48 @@ object CandidatesUtils {
 
     }
 
+  }
+
+  /**
+    * |A| * |B| * |C| >= |D|
+    */
+  def cutUselessAndFail(toChecked: List[(Set[Int], mutable.Set[Int])],
+                        rhsCount: mutable.Map[Int, Int]
+                       ): (List[(Set[Int], mutable.Set[Int])], Array[(Set[Int], Int)]) = {
+
+    val failFDs = ListBuffer.empty[(Set[Int], Int)]
+
+    val trueFDs = toChecked.map{x =>
+      val (t, f) = x._2.partition(y => isBigger(x._1, rhsCount(y), rhsCount))
+      f.foreach(y => failFDs.append((x._1, y)))
+
+      (x._1, t)
+    }.filter(_._2.nonEmpty)
+
+    (trueFDs, failFDs.toArray)
+  }
+
+  def cutUseless(toChecked: List[(Set[Int], mutable.Set[Int])],
+                 rhsCount: mutable.Map[Int, Int]
+                ): List[(Set[Int], mutable.Set[Int])] = {
+
+    val trueFDs = toChecked.map{x =>
+      val t= x._2.filter(y => isBigger(x._1, rhsCount(y), rhsCount))
+
+      (x._1, t)
+    }.filter(_._2.nonEmpty)
+
+    trueFDs
+  }
+
+  def isBigger(lhs: Set[Int], count: Int,rhsCount: mutable.Map[Int, Int]): Boolean = {
+    var mul = 1
+    val flag = lhs.exists{x =>
+      mul *= rhsCount(x)
+
+      mul >= count
+    }
+
+    flag
   }
 }
