@@ -137,62 +137,6 @@ class MinimalFDsMine(private var numPartitions: Int,
 
   }
 
- /* private def findByDfAndRdd(newDF: DataFrame,
-                             newColSize: Int
-                            ): Unit = {
-
-    val commmonAttr = orders.head._1
-
-    val rdd = DataFrameUtils.dfToRdd(newDF).persist(StorageLevel.MEMORY_AND_DISK_SER)
-    val partitionRDD = repart(rdd, commmonAttr).persist(StorageLevel.MEMORY_AND_DISK_SER)
-    val partitionSize = orders.head._2
-
-    // create the map which save cutted leaves from bottom to top
-    val wholeCuttedMap = mutable.HashMap
-      .empty[Int, mutable.HashSet[(Set[Int], Int)]]
-
-    val middle = (newColSize + 1) / 2
-    for (level <- 2 to middle) {
-      // the higher level
-      val symmetrical = newColSize - level
-      if (level < symmetrical) {
-        val time0 = System.currentTimeMillis()
-        val toCheckedHigh = CandidatesUtils.getLevelCandidates(candidates, symmetrical).toList
-        println("====toCheckedHigh: " + "level- " + symmetrical + " " + " lhs: " + toCheckedHigh.toList.length + " whole: " + toCheckedHigh.toList.flatMap(x => x._2.toList).size)
-        if (toCheckedHigh.nonEmpty) {
-          val failFDs = DataFrameUtils.getFailFDs(newDF, toCheckedHigh, moreAttrsCountMap, moreSmallerAttrsCountMap, topFDs, rhsCount)
-          CandidatesUtils.cutFromTopToDown(candidates, failFDs)
-        }
-        println("====toCheckedHigh time: " + "level- " + symmetrical + " " + (System.currentTimeMillis() - time0))
-      }
-
-      // the lower level
-      val time_ = System.currentTimeMillis()
-      val toCheckedCommon = CandidatesUtils.getTargetCandidates(candidates, commmonAttr, level).toList
-      println("====toCheckedLow: " + "level- " + level + " " + " common: " + commmonAttr + " lhs: " + toCheckedCommon.length + " whole: " + toCheckedCommon.flatMap(x => x._2.toList).size)
-      val toCheckedLow = CandidatesUtils.getLevelCandidates(candidates, level).toList
-      println("====toCheckedLow: " + "level- " + level + " " + " lhs: " + toCheckedLow.toList.length + " whole: " + toCheckedLow.toList.flatMap(x => x._2.toList).size)
-      if (toCheckedCommon.nonEmpty) {
-        val (minimalFDs, failFDs, partWithFailFDs) =
-          RddUtils.getMinimalFDs(sc, partitionRDD, toCheckedCommon, results, partitionSize, newColSize, wholeCuttedMap)
-        CandidatesUtils.cutFromDownToTop(candidates, minimalFDs)
-        CandidatesUtils.cutInTopLevels(topFDs, minimalFDs)
-        if (failFDs.nonEmpty) {
-          val cuttedFDsMap = CandidatesUtils.getCuttedFDsMap(candidates, failFDs)
-          RddUtils.updateLevelMap(cuttedFDsMap, partWithFailFDs, wholeCuttedMap, level)
-        }
-      }
-      if (toCheckedLow.nonEmpty) {
-        val minimalFds = DataFrameUtils.getMinimalFDs(newDF, toCheckedLow, lessAttrsCountMap, lessBiggerAttrsCountMap, rhsCount)
-        results ++= minimalFds
-        CandidatesUtils.cutFromDownToTop(candidates, minimalFds)
-        CandidatesUtils.cutInTopLevels(topFDs, minimalFds)
-      }
-      println("====toCheckedLow time: " + "level- " + level + " " + (System.currentTimeMillis() - time_))
-    }
-
-  }*/
-
   def findBySplit(newDF: DataFrame,
                   newColSize: Int
                  ): Unit = {
