@@ -66,34 +66,32 @@ object RddUtils {
                                  partition: List[Array[Int]],
                                  colSize: Int): List[(Set[Int], Int)] = {
 
-    val minimalFDs = fdsBV.value.flatMap(fd => checkFD(partition, fd._1, fd._2, colSize))
+    val minimalFDs = fdsBV.value.flatMap(fd => checkRightFD(partition, fd._1, fd._2, colSize))
 
     minimalFDs
   }
 
-  def checkFD(partition: List[Array[Int]],
+  def checkRightFD(partition: List[Array[Int]],
               lhs: Set[Int],
               rhs: mutable.Set[Int],
               colSize: Int): List[(Set[Int], Int)] = {
 
-    val true_rhs = rhs.clone()
-    val tmp = mutable.Set.empty[Int]
+    val trueRhs = rhs.clone()
     val dict = mutable.HashMap.empty[String, Array[Int]]
 
     partition.foreach(line => {
       val left = takeAttrs(line, lhs)
-      val right = takeAttrRHS(line, true_rhs, colSize)
+      val right = takeAttrRHS(line, trueRhs, colSize)
       val value = dict.getOrElse(left, null)
       if (value != null) {
-        for (i <- true_rhs.toList)
-          if (!value(i).equals(right(i))) true_rhs.remove(i)
+        for (i <- trueRhs.toList)
+          if (!value(i).equals(right(i))) trueRhs.remove(i)
       } else dict.put(left, right)
-      if (true_rhs.isEmpty) return List()
+      if (trueRhs.isEmpty) return List()
     })
 
-    true_rhs ++= tmp
 
-    true_rhs.map(r => (lhs, r)).toList
+    trueRhs.map(r => (lhs, r)).toList
   }
 
   def getFailFDs(sc: SparkContext,
@@ -117,12 +115,12 @@ object RddUtils {
                                          partition: List[Array[Int]],
                                          colSize: Int
                                         ): List[(Set[Int], Int)] = {
-    val wrongFDs = fdsBV.value.flatMap(fd => checkFDWrong(partition, fd._1, fd._2, colSize))
+    val wrongFDs = fdsBV.value.flatMap(fd => checkWrongFD(partition, fd._1, fd._2, colSize))
 
     wrongFDs
   }
 
-  def checkFDWrong(partition: List[Array[Int]],
+/*  def checkFDWrong(partition: List[Array[Int]],
               lhs: Set[Int],
               rhs: mutable.Set[Int],
               colSize: Int): List[(Set[Int], Int)] = {
@@ -131,6 +129,32 @@ object RddUtils {
     val wrong = rhsCount.filter(r => r._2 != lhsCount).map(x => (lhs, x._1))
 
     wrong.toList
+  }*/
+
+  def checkWrongFD(partition: List[Array[Int]],
+                   lhs: Set[Int],
+                   rhs: mutable.Set[Int],
+                   colSize: Int): List[(Set[Int], Int)] = {
+
+    val trueRhs = rhs.clone()
+    val wrongRhs = mutable.Set.empty[Int]
+    val dict = mutable.HashMap.empty[String, Array[Int]]
+
+    partition.foreach(line => {
+      val left = takeAttrs(line, lhs)
+      val right = takeAttrRHS(line, trueRhs, colSize)
+      val value = dict.getOrElse(left, null)
+      if (value != null) {
+        for (i <- trueRhs.toList) {
+          if (!value(i).equals(right(i))) {
+            trueRhs.remove(i)
+          }
+        }
+      } else dict.put(left, right)
+      if (trueRhs.isEmpty) return wrongRhs.map(r => (lhs, r)).toList
+    })
+
+    wrongRhs.map(r => (lhs, r)).toList
   }
 
   private def takeAttrs(arr: Array[Int],
