@@ -3,7 +3,7 @@ package com.hazzacheng.FD
 import com.hazzacheng.FD.utils._
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.storage.StorageLevel
 
 import scala.collection.mutable
@@ -19,13 +19,14 @@ import scala.collection.mutable
   */
 
 class MinimalFDsMine(private var numPartitions: Int,
+                     private val ss: SparkSession,
                      private val sc: SparkContext,
                      private val df: DataFrame,
                      private val colSize: Int,
-                     private val filePath: String
+                     private val tempFilePath: String
                     ) extends Serializable {
 
-  val results = mutable.ListBuffer.empty[(Set[Int], Int)]
+  var results = mutable.ListBuffer.empty[(Set[Int], Int)]
   val allSame = mutable.HashSet.empty[Int]
   val candidates = mutable.HashMap.empty[Int, mutable.HashMap[Set[Int], mutable.Set[Int]]]
   val topCandidates = mutable.Set.empty[(Set[Int], Int)]
@@ -38,9 +39,11 @@ class MinimalFDsMine(private var numPartitions: Int,
   val ordersMap = mutable.Map.empty[Int, Int]
   var orders = Array[(Int, Int)]()
   val rhsCount = mutable.Map.empty[Int, Int]
+  var rhsCount1 = mutable.Map.empty[Int, Int]
   val rdds = mutable.Map.empty[Int, RDD[List[Array[Int]]]]
   val rddsCountMap = mutable.Map.empty[Int, Int]
-  val THRESHOLD = 10
+  val THRESHOLD = 8
+  val COLMAX = 1
 
   def setNumPartitions(numPartitions: Int): this.type = {
     this.numPartitions = numPartitions
@@ -87,7 +90,11 @@ class MinimalFDsMine(private var numPartitions: Int,
 /*    candidates ++= CandidatesUtils.removeBottomFDs(CandidatesUtils.getCandidatesParallel(sc, newColSize))
     CandidatesUtils.cutFromDownToTop(candidates, bottomFDs)*/
 
-    findByDFandRDD(newDF, newColSize)
+    if (newColSize <= COLMAX) {
+      findByDFandRDD(newDF, newColSize)
+    } else {
+      findBySplit(newDF, newColSize)
+    }
 
     // check the top levels
     if (topFDs.nonEmpty) {
@@ -109,27 +116,39 @@ class MinimalFDsMine(private var numPartitions: Int,
     val part1 = newColSize / 3 - 1
     val cols1 = Range(1, part1 + 1).toSet
 
-    val df1 = DataFrameUtils.getSelectedDF(newDF, numPartitions, cols1).persist(StorageLevel.MEMORY_AND_DISK_SER)
-    println("===== DF1 Count: " + df1.count())
+    val df1 = DataFrameUtils.getSelectedDF(ss, newDF, tempFilePath, numPartitions, cols1).persist(StorageLevel.MEMORY_AND_DISK_SER)
+    val size1 = df1.count()
+    println("===== DF1 Count: " + size1 + " COLS: " + df1.columns.length)
     findInPart(df1, part1, cols1)
 
     df1.unpersist()
     rdds.foreach(_._2.unpersist())
     rdds.clear()
     rddsCountMap.clear()
+    lessBiggerAttrsCountMap.clear()
+    lessAttrsCountMap.clear()
+    moreSmallerAttrsCountMap.clear()
+    moreAttrsCountMap.clear()
 
     // check the part2
     val part2 = newColSize - part1
-    val cols2 = Range(1, part2 + 1).toSet
+    val cols2 = Range(part1 + 1, newColSize + 1).toSet
 
-    val df2 = DataFrameUtils.getSelectedDF(newDF, numPartitions, cols2).persist(StorageLevel.MEMORY_AND_DISK_SER)
-    println("===== DF2 Count: " + df2.count())
-    findInPart(df2, part2, cols2, part2)
+    rhsCount1 = rhsCount.filter(_._1 > part1).map(x => (x._1 - part1, x._2))
+
+    val df2 = DataFrameUtils.getSelectedDF(ss, newDF, tempFilePath, numPartitions, cols2).persist(StorageLevel.MEMORY_AND_DISK_SER)
+    val size2 = df2.count()
+    println("===== DF2 Count: " + size2 + " COLS: " + df2.columns.length)
+    findInPart(df2, part2, cols2, part1)
 
     df2.unpersist()
     rdds.foreach(_._2.unpersist())
     rdds.clear()
     rddsCountMap.clear()
+    lessBiggerAttrsCountMap.clear()
+    lessAttrsCountMap.clear()
+    moreSmallerAttrsCountMap.clear()
+    moreAttrsCountMap.clear()
 
     // check the whole parts
     findByDFandRDD(newDF, newColSize)
@@ -155,12 +174,14 @@ class MinimalFDsMine(private var numPartitions: Int,
           val toCheckedHigh = CandidatesUtils.getTargetCandidates(candidates, col, high).toList
           val size = CandidatesUtils.getToCheckedSize(toCheckedHigh)
           if (size > 0 && size <= THRESHOLD) {
-            val failFDs = DataFrameUtils.getFailFDs(df, toCheckedHigh, moreAttrsCountMap, moreSmallerAttrsCountMap, topFDs, rhsCount)
+            val (failFDs, rightFDs) = DataFrameUtils.getFailFDs(df, toCheckedHigh, moreAttrsCountMap, moreSmallerAttrsCountMap, rhsCount)
+            topFDs ++= rightFDs
             CandidatesUtils.cutFromTopToDown(candidates, failFDs)
           }
           if (size > THRESHOLD) {
             val rdd = rdds.getOrElseUpdate(col, RddUtils.repart(RDD, col).persist(StorageLevel.MEMORY_AND_DISK))
-            val failFDs = RddUtils.getFailFDs(sc, rdd, toCheckedHigh, cols, topFDs)
+            val (failFDs, rightFDs) = RddUtils.getFailFDs(sc, rdd, toCheckedHigh, cols)
+            topFDs ++= rightFDs
             CandidatesUtils.cutFromTopToDown(candidates, failFDs)
           }
           if (size > 0)
@@ -204,19 +225,21 @@ class MinimalFDsMine(private var numPartitions: Int,
       for (col <- 1 to cols) {
 
         // the higher level
-        val high = cols - low
+        val high = cols - low + 1
         if (low < high) {
           val t = System.currentTimeMillis()
 
           val toCheckedHigh = CandidatesUtils.getTargetCandidates(candidates, col, high, colsSet).toList
           val size = CandidatesUtils.getToCheckedSize(toCheckedHigh)
           if (size > 0 && size <= THRESHOLD) {
-            val failFDs = DataFrameUtils.getFailFDs(df, toCheckedHigh, moreAttrsCountMap, moreSmallerAttrsCountMap, topFDs, rhsCount)
+            val (failFDs, rightFDs) = DataFrameUtils.getFailFDs(df, toCheckedHigh, moreAttrsCountMap, moreSmallerAttrsCountMap, rhsCount)
+            topFDs ++= rightFDs
             CandidatesUtils.cutFromTopToDown(candidates, failFDs)
           }
           if (size > THRESHOLD) {
             val rdd = rdds.getOrElseUpdate(col, RddUtils.repart(RDD, col).persist(StorageLevel.MEMORY_AND_DISK))
-            val failFDs = RddUtils.getFailFDs(sc, rdd, toCheckedHigh, cols, topFDs)
+            val (failFDs, rightFDs) = RddUtils.getFailFDs(sc, rdd, toCheckedHigh, cols)
+            topFDs ++= rightFDs
             CandidatesUtils.cutFromTopToDown(candidates, failFDs)
           }
           if (size > 0)
@@ -225,7 +248,7 @@ class MinimalFDsMine(private var numPartitions: Int,
 
         // the lower level
         val t = System.currentTimeMillis()
-        val toCheckedLow = CandidatesUtils.getTargetCandidates(candidates, col, high, colsSet).toList
+        val toCheckedLow = CandidatesUtils.getTargetCandidates(candidates, col, low, colsSet).toList
         val size = CandidatesUtils.getToCheckedSize(toCheckedLow)
         if (size > 0 && size <= THRESHOLD) {
           val minimalFds = DataFrameUtils.getMinimalFDs(df, toCheckedLow, lessAttrsCountMap, lessBiggerAttrsCountMap, rhsCount)
@@ -260,19 +283,26 @@ class MinimalFDsMine(private var numPartitions: Int,
       for (col <- 1 to cols) {
 
         // the higher level
-        val high = cols - low
+        val high = cols - low + 1
         if (low < high) {
           val t = System.currentTimeMillis()
 
-          val toCheckedHigh = CandidatesUtils.getTargetCandidates(candidates, col, high, colsSet).toList
-          val size = CandidatesUtils.getToCheckedSize(toCheckedHigh)
+          val toCheckedHigh = CandidatesUtils.getTargetCandidates(candidates, col + offset, high, colsSet).toList
+          val toChecked = CandidatesUtils.reduceOffset(toCheckedHigh, offset)
+          val size = CandidatesUtils.getToCheckedSize(toChecked)
           if (size > 0 && size <= THRESHOLD) {
-            val failFDs = DataFrameUtils.getFailFDs(df, toCheckedHigh, moreAttrsCountMap, moreSmallerAttrsCountMap, topFDs, rhsCount)
+            val (a, b)= DataFrameUtils.getFailFDs(df, toChecked, moreAttrsCountMap, moreSmallerAttrsCountMap, rhsCount1)
+            val failFDs = CandidatesUtils.addOffset(a, offset)
+            val rightFDs = CandidatesUtils.addOffset(b, offset)
+            topFDs ++= rightFDs
             CandidatesUtils.cutFromTopToDown(candidates, failFDs)
           }
           if (size > THRESHOLD) {
             val rdd = rdds.getOrElseUpdate(col, RddUtils.repart(RDD, col).persist(StorageLevel.MEMORY_AND_DISK))
-            val failFDs = RddUtils.getFailFDs(sc, rdd, toCheckedHigh, cols, topFDs)
+            val (a, b) = RddUtils.getFailFDs(sc, rdd, toChecked, cols)
+            val failFDs = CandidatesUtils.addOffset(a, offset)
+            val rightFDs = CandidatesUtils.addOffset(b, offset)
+            topFDs ++= rightFDs
             CandidatesUtils.cutFromTopToDown(candidates, failFDs)
           }
           if (size > 0)
@@ -281,18 +311,22 @@ class MinimalFDsMine(private var numPartitions: Int,
 
         // the lower level
         val t = System.currentTimeMillis()
-        val toCheckedLow = CandidatesUtils.getTargetCandidates(candidates, col, high, colsSet).toList
-        val size = CandidatesUtils.getToCheckedSize(toCheckedLow)
+        val toCheckedLow = CandidatesUtils.getTargetCandidates(candidates, col, low, colsSet).toList
+        val toChecked = CandidatesUtils.reduceOffset(toCheckedLow, offset)
+        val size = CandidatesUtils.getToCheckedSize(toChecked)
         if (size > 0 && size <= THRESHOLD) {
-          val minimalFds = DataFrameUtils.getMinimalFDs(df, toCheckedLow, lessAttrsCountMap, lessBiggerAttrsCountMap, rhsCount)
-          results ++= minimalFds
-          CandidatesUtils.cutFromDownToTop(candidates, minimalFds)
-          CandidatesUtils.cutInTopLevels(topFDs, minimalFds)
+          val t = DataFrameUtils.getMinimalFDs(df, toChecked, lessAttrsCountMap, lessBiggerAttrsCountMap, rhsCount1)
+          val minimalFDs = CandidatesUtils.addOffset(t, offset)
+          results ++= minimalFDs
+          CandidatesUtils.cutFromDownToTop(candidates, minimalFDs)
+          CandidatesUtils.cutInTopLevels(topFDs, minimalFDs)
         }
         if (size > THRESHOLD) {
           val rdd = rdds.getOrElseUpdate(col, RddUtils.repart(RDD, col).persist(StorageLevel.MEMORY_AND_DISK))
           val partitionSize = rddsCountMap.getOrElseUpdate(col, rdd.count().toInt)
-          val minimalFDs = RddUtils.getMinimalFDs(sc, rdd, toCheckedLow, partitionSize, cols)
+          val t = RddUtils.getMinimalFDs(sc, rdd, toChecked, partitionSize, cols)
+          val minimalFDs = CandidatesUtils.addOffset(t, offset)
+          //results = CandidatesUtils.cutFromRes(results, minimalFDs)
           results ++= minimalFDs
           CandidatesUtils.cutFromDownToTop(candidates, minimalFDs)
           CandidatesUtils.cutInTopLevels(topFDs, minimalFDs)

@@ -63,9 +63,19 @@ object DataFrameUtils {
     newDF
   }
 
-  def getSelectedDF(df: DataFrame, numPartitions:Int, del: Set[Int]): DataFrame = {
-    val cols = df.columns.zipWithIndex.filter(x => !del.contains(x._2 + 1)).map(_._1)
-    val newDF = df.select(cols.head, cols.tail: _*).distinct()//.repartition(numPartitions)
+  def getSelectedDF(ss: SparkSession,
+                    df: DataFrame,
+                    tmpFilePath: String,
+                    numPartitions:Int,
+                    notDel: Set[Int]): DataFrame = {
+    var temp = tmpFilePath
+    if (!tmpFilePath.endsWith("/")) temp += "/"
+    temp += System.currentTimeMillis()
+
+    val cols = df.columns.zipWithIndex.filter(x => notDel.contains(x._2 + 1)).map(_._1)
+    df.select(cols.head, cols.tail: _*).distinct().write.csv(temp)//.repartition(numPartitions)
+
+    val newDF = ss.read.csv(temp)
 
     newDF
   }
@@ -193,9 +203,8 @@ object DataFrameUtils {
                  toChecked: List[(Set[Int], mutable.Set[Int])],
                  moreAttrsCountMap: mutable.HashMap[Set[Int], Int],
                  moreSmallerAttrsCountMap: mutable.HashMap[Set[Int], Int],
-                 topFDs: mutable.Set[(Set[Int], Int)],
                  rhsCount: mutable.Map[Int, Int]
-                ): Array[(Set[Int], Int)] = {
+                ): (Array[(Set[Int], Int)], Array[(Set[Int], Int)]) = {
     val fds = toChecked.flatMap(x => x._2.map((x._1, _))).toArray
 
     if (moreSmallerAttrsCountMap.nonEmpty
@@ -214,9 +223,8 @@ object DataFrameUtils {
     }
 
     val rightFDs = fds.toSet -- failFDs
-    topFDs ++= rightFDs
 
-    failFDs
+    (failFDs, rightFDs.toArray)
   }
 
 }

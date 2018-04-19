@@ -242,4 +242,29 @@ object CandidatesUtils {
     }
   }
 
+  def reduceOffset(toChecked: List[(Set[Int], mutable.Set[Int])],
+                   offset: Int): List[(Set[Int], mutable.Set[Int])] = {
+
+    val temp = toChecked.map(x => (x._1.map(_ - offset), x._2.map(_ - offset)))
+
+    temp
+  }
+
+  def addOffset(fds: Array[(Set[Int], Int)], offset: Int): Array[(Set[Int], Int)] = {
+    val temp = fds.map(x => (x._1.map(_ + offset), x._2 + offset))
+
+    temp
+  }
+
+  def cutFromRes(results: mutable.ListBuffer[(Set[Int], Int)],
+                 fds: Array[(Set[Int], Int)]): mutable.ListBuffer[(Set[Int], Int)] = {
+    val res = results.filter(x => !isSuperSet(x._1, x._2, fds))
+
+    res
+  }
+
+  def isSuperSet(lhs: Set[Int], rhs: Int, fds: Array[(Set[Int], Int)]): Boolean = {
+    fds.exists(x => x._2 == rhs && isSubSet(lhs, x._1))
+  }
+
 }

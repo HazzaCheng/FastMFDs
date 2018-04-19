@@ -1,9 +1,8 @@
 package com.hazzacheng.FD
 
-import com.hazzacheng.FD.utils.{DataFrameUtils, RddUtils}
+import com.hazzacheng.FD.utils.RddUtils
 import org.apache.spark.SparkConf
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.storage.StorageLevel
 
 /**
   * Created with IntelliJ IDEA.
@@ -32,7 +31,7 @@ object Main {
     val temp = args(2)
 
     val (df, colSize, tempFilePath) = utils.DataFrameUtils.getDataFrameFromCSV(ss, numPartitions, input, temp)
-    val fds = new MinimalFDsMine(numPartitions, sc, df, colSize, tempFilePath).run()
+    val fds = new MinimalFDsMine(numPartitions, ss, sc, df, colSize, temp).run()
     val res = RddUtils.outPutFormat(fds)
 
     sc.parallelize(res).saveAsTextFile(output)

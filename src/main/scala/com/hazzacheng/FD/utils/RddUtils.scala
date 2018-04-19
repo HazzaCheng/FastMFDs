@@ -97,18 +97,16 @@ object RddUtils {
   def getFailFDs(sc: SparkContext,
                  partitionsRDD: RDD[List[Array[Int]]],
                  fds: List[(Set[Int], mutable.Set[Int])],
-                 colSize: Int,
-                 topFDs: mutable.Set[(Set[Int], Int)]
-                ): Array[(Set[Int], Int)] = {
+                 colSize: Int
+                ): (Array[(Set[Int], Int)], Array[(Set[Int], Int)]) = {
     val fdsBV = sc.broadcast(fds)
     val failFDs = partitionsRDD.flatMap(p => checkEachPartitionForWrong(fdsBV, p, colSize)).collect().distinct
 
     fdsBV.unpersist()
 
     val rightFDs = fds.flatMap(x => x._2.map(y => (x._1, y))).toSet -- failFDs
-    topFDs ++= rightFDs
 
-    failFDs
+    (failFDs, rightFDs.toArray)
   }
 
   private def checkEachPartitionForWrong(fdsBV: Broadcast[List[(Set[Int], mutable.Set[Int])]],
