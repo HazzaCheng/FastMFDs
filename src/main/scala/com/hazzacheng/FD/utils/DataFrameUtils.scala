@@ -1,12 +1,10 @@
 package com.hazzacheng.FD.utils
 
 import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.types.{DataType, IntegerType, StructType}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.storage.StorageLevel
 
 import scala.collection.mutable
-import scala.collection.mutable.ListBuffer
 
 /**
   * Created with IntelliJ IDEA.
@@ -33,7 +31,7 @@ object DataFrameUtils {
     val rdd = sc.textFile(filePath).distinct().persist()
     val words = rdd.flatMap(_.split(",")).distinct().zipWithIndex()
       .collect().map(x => (x._1, x._2.toInt))
-//    val words = rdd.flatMap(_.split(",")).distinct().map(x => (x, x.hashCode)).collect()
+    //    val words = rdd.flatMap(_.split(",")).distinct().map(x => (x, x.hashCode)).collect()
     println("===== Words: " + words.length)
     val word2index = mutable.HashMap.empty[String, Int]
     words.foreach(x => word2index.put(x._1, x._2))
@@ -57,22 +55,6 @@ object DataFrameUtils {
     rdd
   }
 
-  def createSchema(colSize: Int): StructType = {
-    var schema = new StructType()
-
-    Range(0, colSize).foreach(x => schema = schema.add("c" + x, IntegerType, true))
-
-    schema
-  }
-
-  def castColumnTo(df: DataFrame, tpe: DataType): DataFrame = {
-    val cols = df.columns
-    var temp = df
-
-    cols.foreach(x => temp = temp.withColumn(x, temp(x).cast(tpe)))
-
-    temp
-  }
 
   def getNewDF(df: DataFrame, numPartitions:Int, del: Set[Int]): DataFrame = {
     val cols = df.columns.zipWithIndex.filter(x => !del.contains(x._2 + 1)).map(_._1)
@@ -111,7 +93,7 @@ object DataFrameUtils {
 
     for (i <- 0 until (colSize - 1) if !allSame.contains(i + 1))
       for (j <- (i + 1) until colSize if !allSame.contains(j + 1))
-          tuples.append(((i + 1, j + 1), (columns(i), columns(j))))
+        tuples.append(((i + 1, j + 1), (columns(i), columns(j))))
 
     val res = tuples.toList.map(x =>
       (x._1, df.groupBy(x._2._1, x._2._2)
@@ -140,66 +122,6 @@ object DataFrameUtils {
     val fds = res.toArray.map(x => if (x._1 == x._2._1) (x._1, x._2._2) else (x._1, x._2._1))
 
     (fds, lhs, whole)
-  }
-
-  def getDownFds(df: DataFrame,
-                 colSize: Int,
-                 allSame: mutable.HashSet[Int]
-                ): (Array[(Int, Int)], Map[Int, Int]) = {
-    val RDD = DataFrameUtils.dfToRdd(df).persist(StorageLevel.MEMORY_AND_DISK_SER)
-    val singleCount = getSingleColCount(df, allSame)
-
-    val tuples = mutable.ListBuffer.empty[((Int, Int), (String, String))]
-
-    val lists = mutable.ListBuffer.empty[(Int, ListBuffer[(Int, Int)])]
-    val equal = mutable.Set.empty[(Int, Int)]
-
-    for (i <- 1 to colSize if !allSame.contains(i)) {
-      val list = ListBuffer.empty[(Int, Int)]
-      for (j <- 1 to colSize if !allSame.contains(j) && i != j) {
-        if (singleCount(i) == singleCount(j)) {
-          if (!equal.contains((j, i))) equal.add((i, j))
-        }
-        if (singleCount(i) > singleCount(j)) list.append((i, j))
-      }
-      if (list.nonEmpty) lists.append((i, list))
-    }
-
-    val (r, f) = lists.partition(_._2.length > 8)
-
-    val columns = df.columns
-
-    val fds = mutable.ListBuffer.empty[(Int, Int)]
-
-    val r1 = equal.filter{x =>
-      val count = df.groupBy(columns(x._1 - 1), columns(x._2 - 1)).count().count().toInt
-
-      count == singleCount(x._1)
-    }
-    fds ++= r1.flatMap(x => List((x._1, x._2), (x._2, x._1))).toList
-
-    val r2 = f.flatMap{x => x._2.toList.filter(y =>
-      df.groupBy(columns(y._1 - 1), columns(y._2 - 1)).count().count().toInt == singleCount(x._1)
-    )}
-    fds ++= r2
-
-    val r3 = r.flatMap{t =>
-      val rdd = RDD.map(line => (line(t._1 - 1), List(line))).reduceByKey(_ ++ _)
-
-      val wrong = rdd.flatMap(p =>t._2.filter(x => check(p._2, x._2 - 1))).collect()
-      val fds = t._2.toSet -- wrong.distinct
-      /*val fds = t._2.filter{fd =>
-        !rdd.map(p => check(p._2, fd._2 - 1)).collect().contains(true)
-      }*/
-      rdd.unpersist()
-
-      fds
-    }
-    fds ++= r3
-
-    RDD.unpersist()
-
-    (fds.toArray, singleCount)
   }
 
   def check(p: List[Array[Int]], i: Int): Boolean = {

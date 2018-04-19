@@ -217,79 +217,10 @@ object CandidatesUtils {
     }
   }
 
-  /*  def getCutted(candidates: mutable.HashMap[Set[Int], mutable.Set[Int]],
-              fd: (Set[Int], Int)): mutable.HashSet[(Set[Int], Int)] = {
-  val res = mutable.HashSet.empty[(Set[Int], Int)]
-
-  val lhs = candidates.keys.filter(x => isSubSet(fd._1, x)).toList
-  res ++= getCuttedInCandidates(candidates, lhs, fd._2)
-
-  res
-}*/
-
-  def getCuttedNotDel(candidates: mutable.HashMap[Int, mutable.HashMap[Set[Int], mutable.Set[Int]]],
-                      fd: (Set[Int], Int)): mutable.HashSet[(Set[Int], Int)] = {
-    val res = mutable.HashSet.empty[(Set[Int], Int)]
-    val len = fd._1.size
-
-    val lhs = candidates(len + 1).keys.filter(x => isSubSet(x, fd._1)).toList
-    //    val lhs = candidates.keys.filter(x => x.size == len + 1 && isSubSet(x, fd._1)).toList
-    res ++= getCuttedInCandidatesNotDel(candidates, lhs, fd._2)
-
-    res
-  }
-
-  /*  def getCuttedInCandidates(candidates: mutable.HashMap[Set[Int], mutable.Set[Int]],
-                          lhs: List[Set[Int]],
-                          rhs: Int): List[(Set[Int], Int)]= {
-  val cutted = mutable.ListBuffer.empty[(Set[Int], Int)]
-
-  for (l <- lhs) {
-    val value = candidates(l)
-    if (value contains rhs) {
-      cutted.append((l, rhs))
-      if (value.size == 1) candidates.remove(l)
-      else {
-        value.remove(rhs)
-        candidates.update(l, value)
-      }
-    }
-  }
-
-  cutted.toList
-}*/
-
-  def getCuttedInCandidatesNotDel(candidates: mutable.HashMap[Int, mutable.HashMap[Set[Int], mutable.Set[Int]]],
-                                  lhs: List[Set[Int]],
-                                  rhs: Int): List[(Set[Int], Int)] = {
-    val cutted = mutable.ListBuffer.empty[(Set[Int], Int)]
-
-    for (l <- lhs) {
-      val value = candidates(l.size)(l)
-      if (value contains rhs) cutted.append((l, rhs))
-    }
-
-    cutted.toList
-  }
-
   def isSubSet(big: Set[Int], small: Set[Int]): Boolean = {
     small.toList.foreach(s => if (!big.contains(s)) return false)
 
     true
-  }
-
-  def getCuttedFDsMap(candidates: mutable.HashMap[Int, mutable.HashMap[Set[Int], mutable.Set[Int]]],
-                      failFDs: Set[(Set[Int], Int)]
-                     ): mutable.HashMap[(Set[Int], Int), mutable.HashSet[(Set[Int], Int)]] = {
-    val map = mutable.HashMap.empty[(Set[Int], Int), mutable.HashSet[(Set[Int], Int)]]
-    failFDs.foreach { x =>
-      val cutted = getCuttedNotDel(candidates, x)
-      if (cutted.nonEmpty) {
-        map.put(x, cutted)
-      }
-    }
-
-    map
   }
 
   def findMinFD(topFDs: mutable.Set[(Set[Int], Int)]): Unit = {
