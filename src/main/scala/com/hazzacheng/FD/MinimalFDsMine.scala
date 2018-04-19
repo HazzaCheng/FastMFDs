@@ -71,7 +71,7 @@ class MinimalFDsMine(private var numPartitions: Int,
     df.unpersist()
     println("====== New DF Count: " + newSize)
 
-/*    // check the fds with the longest lhs
+    // check the fds with the longest lhs
     topCandidates ++= getLongestLhs(newColSize)
     CandidatesUtils.cutInTopLevels(topCandidates, bottomFDs)
     time = System.currentTimeMillis()
@@ -82,10 +82,10 @@ class MinimalFDsMine(private var numPartitions: Int,
     candidates ++= CandidatesUtils.removeTopAndBottom(CandidatesUtils.getCandidatesParallel(sc, newColSize), newColSize)
     // cut from bottom level and top level
     CandidatesUtils.cutFromDownToTop(candidates, bottomFDs)
-    CandidatesUtils.cutFromTopToDown(candidates, wrongTopFDs)*/
+    CandidatesUtils.cutFromTopToDown(candidates, wrongTopFDs)
 
-    candidates ++= CandidatesUtils.removeBottomFDs(CandidatesUtils.getCandidatesParallel(sc, newColSize))
-    CandidatesUtils.cutFromDownToTop(candidates, bottomFDs)
+/*    candidates ++= CandidatesUtils.removeBottomFDs(CandidatesUtils.getCandidatesParallel(sc, newColSize))
+    CandidatesUtils.cutFromDownToTop(candidates, bottomFDs)*/
 
     findByDFandRDD(newDF, newColSize)
 
