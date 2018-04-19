@@ -120,17 +120,6 @@ object RddUtils {
     wrongFDs
   }
 
-/*  def checkFDWrong(partition: List[Array[Int]],
-              lhs: Set[Int],
-              rhs: mutable.Set[Int],
-              colSize: Int): List[(Set[Int], Int)] = {
-    val lhsCount = partition.map(p => (takeAttrs(p, lhs), 1)).groupBy(_._1).size
-    val rhsCount = rhs.map(r => (r, partition.map(p => (takeAttrs(p, lhs + r), 1)).groupBy(_._1).size))
-    val wrong = rhsCount.filter(r => r._2 != lhsCount).map(x => (lhs, x._1))
-
-    wrong.toList
-  }*/
-
   def checkWrongFD(partition: List[Array[Int]],
                    lhs: Set[Int],
                    rhs: mutable.Set[Int],

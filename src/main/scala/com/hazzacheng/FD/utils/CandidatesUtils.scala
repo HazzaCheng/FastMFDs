@@ -169,6 +169,12 @@ object CandidatesUtils {
     candidates
   }
 
+  def removeBottomFDs(candidates: mutable.HashMap[Int, mutable.HashMap[Set[Int], mutable.Set[Int]]]
+                     ): mutable.HashMap[Int, mutable.HashMap[Set[Int], mutable.Set[Int]]] = {
+    candidates.remove(1)
+    candidates
+  }
+
 
   def cutInTopLevels(topLevels: mutable.Set[(Set[Int], Int)],
                      minimal: Array[(Set[Int], Int)]): Unit = {
