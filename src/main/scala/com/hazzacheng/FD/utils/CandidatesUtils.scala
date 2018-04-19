@@ -144,7 +144,7 @@ object CandidatesUtils {
     val res = mutable.HashMap.empty[Set[Int], mutable.Set[Int]]
 
     for (key <- candidates(level).keys) {
-      if (key.contains(common) && key.exists(!cols.contains(_))) {
+      if (key.contains(common) && key.forall(cols.contains)) {
         val vals = candidates(level)(key).partition(cols.contains)
         res.put(key, vals._1)
         if (vals._2.isEmpty) candidates(level).remove(key)
