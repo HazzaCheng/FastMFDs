@@ -136,6 +136,7 @@ object RddUtils {
       if (value != null) {
         for (i <- trueRhs.toList) {
           if (!value(i).equals(right(i))) {
+            wrongRhs.add(i)
             trueRhs.remove(i)
           }
         }
