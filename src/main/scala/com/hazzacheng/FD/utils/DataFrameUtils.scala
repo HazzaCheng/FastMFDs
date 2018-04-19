@@ -113,6 +113,64 @@ object DataFrameUtils {
     res
   }
 
+  def getMinimalFDsOffset(df: DataFrame,
+                          toChecked: List[(Set[Int], mutable.Set[Int])],
+                          lessAttrsCountMap: mutable.HashMap[Set[Int], Int],
+                          lessBiggerAttrsCountMap: mutable.HashMap[Set[Int], Int],
+                          rhsCount: mutable.Map[Int, Int],
+                          offset: Int
+                         ): Array[(Set[Int], Int)] = {
+    val fds = toChecked.flatMap(x => x._2.map((x._1, _))).toArray
+
+    if (lessBiggerAttrsCountMap.nonEmpty
+      && fds.last._1.size == lessBiggerAttrsCountMap.last._1.size) {
+      lessAttrsCountMap.clear()
+      lessAttrsCountMap ++= lessBiggerAttrsCountMap
+      lessBiggerAttrsCountMap.clear()
+    }
+
+    val minimalFDs = fds.filter{fd =>
+      val lhs = lessAttrsCountMap.getOrElseUpdate(fd._1, getAttrsCount(df, fd._1))
+      if (lhs >= rhsCount(fd._2 + offset)) {
+        val whole = lessBiggerAttrsCountMap.getOrElseUpdate(fd._1 + fd._2, getAttrsCount(df, fd._1 + fd._2))
+        lhs == whole
+      } else false
+    }
+
+    minimalFDs.map(x => (x._1.map(y => y + offset), x._2 + offset))
+  }
+
+  def getFailFDsOffset(df: DataFrame,
+                       toChecked: List[(Set[Int], mutable.Set[Int])],
+                       moreAttrsCountMap: mutable.HashMap[Set[Int], Int],
+                       moreSmallerAttrsCountMap: mutable.HashMap[Set[Int], Int],
+                       topFDs: mutable.Set[(Set[Int], Int)],
+                       rhsCount: mutable.Map[Int, Int],
+                       offset: Int
+                      ): Array[(Set[Int], Int)] = {
+    val fds = toChecked.flatMap(x => x._2.map((x._1, _))).toArray
+
+    if (moreSmallerAttrsCountMap.nonEmpty
+      && fds.last._1.size + 1 == moreSmallerAttrsCountMap.last._1.size) {
+      moreAttrsCountMap.clear()
+      moreAttrsCountMap ++= moreSmallerAttrsCountMap
+      moreSmallerAttrsCountMap.clear()
+    }
+
+    val failFDs = fds.filter{fd =>
+      val whole = moreAttrsCountMap.getOrElseUpdate(fd._1 + fd._2, getAttrsCount(df, fd._1 + fd._2))
+      if (whole >= rhsCount(fd._2 + offset)) {
+        val lhs = moreSmallerAttrsCountMap.getOrElseUpdate(fd._1, getAttrsCount(df, fd._1))
+        lhs != whole
+      } else true
+    }
+
+    val rightFDs = fds.toSet -- failFDs
+    topFDs ++= rightFDs.map(x => (x._1.map(y => y + offset), x._2 + offset))
+
+    failFDs.map(x => (x._1.map(y => y + offset), x._2 + offset))
+  }
+
   def getBottomFDs(df: DataFrame,
                    colSize: Int,
                    allSame: mutable.HashSet[Int]

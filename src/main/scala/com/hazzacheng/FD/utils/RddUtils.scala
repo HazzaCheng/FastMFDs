@@ -40,6 +40,7 @@ object RddUtils {
     partitions
   }
 
+
   def getMinimalFDs(sc: SparkContext,
                     partitionsRDD: RDD[List[Array[Int]]],
                     fds: List[(Set[Int], mutable.Set[Int])],
@@ -60,6 +61,29 @@ object RddUtils {
     fdsBV.unpersist()
 
     minimalFDs
+  }
+
+  def getMinimalFDsOffset(sc: SparkContext,
+                          partitionsRDD: RDD[List[Array[Int]]],
+                          fds: List[(Set[Int], mutable.Set[Int])],
+                          partitionSize: Int,
+                          colSize: Int,
+                          offset: Int
+                          ): Array[(Set[Int], Int)] = {
+
+    val fdsBV = sc.broadcast(fds)
+
+    val duplicatesRDD = partitionsRDD.flatMap(p => checkEachPartition(fdsBV, p, colSize))
+      .persist(StorageLevel.MEMORY_AND_DISK_SER)
+
+    val candidates = duplicatesRDD.map(x => (x, 1)).reduceByKey(_ + _).collect()
+    // TODO: local vs parallel
+    val minimalFDs = candidates.filter(_._2 == partitionSize).map(_._1)
+
+    duplicatesRDD.unpersist()
+    fdsBV.unpersist()
+
+    minimalFDs.map(x => (x._1.map(y => y + offset), x._2 + offset))
   }
 
   private def checkEachPartition(fdsBV: Broadcast[List[(Set[Int], mutable.Set[Int])]],
@@ -107,6 +131,24 @@ object RddUtils {
     val rightFDs = fds.flatMap(x => x._2.map(y => (x._1, y))).toSet -- failFDs
 
     (failFDs, rightFDs.toArray)
+  }
+
+  def getFailFDsOffset(sc: SparkContext,
+                       partitionsRDD: RDD[List[Array[Int]]],
+                       fds: List[(Set[Int], mutable.Set[Int])],
+                       colSize: Int,
+                       topFDs: mutable.Set[(Set[Int], Int)],
+                       offset: Int
+                       ): Array[(Set[Int], Int)] = {
+    val fdsBV = sc.broadcast(fds)
+    val failFDs = partitionsRDD.flatMap(p => checkEachPartitionForWrong(fdsBV, p, colSize)).collect().distinct
+
+    fdsBV.unpersist()
+
+    val rightFDs = fds.flatMap(x => x._2.map(y => (x._1, y))).toSet -- failFDs
+    topFDs ++= rightFDs.map(x => (x._1.map(y => y + offset), x._2 + offset))
+
+    failFDs.map(x => (x._1.map(y => y + offset), x._2 + offset))
   }
 
   private def checkEachPartitionForWrong(fdsBV: Broadcast[List[(Set[Int], mutable.Set[Int])]],
