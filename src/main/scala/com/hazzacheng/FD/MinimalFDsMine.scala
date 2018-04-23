@@ -43,7 +43,7 @@ class MinimalFDsMine(private var numPartitions: Int,
   val rdds = mutable.Map.empty[Int, RDD[List[Array[Int]]]]
   val rddsCountMap = mutable.Map.empty[Int, Int]
   val THRESHOLD = 8
-  val COLMAX = 1
+  val COLMAX = 15
 
   def setNumPartitions(numPartitions: Int): this.type = {
     this.numPartitions = numPartitions
