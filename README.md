@@ -1,6 +1,6 @@
 # FastMFDs
 
-FastMFDs is an efficient and scalable functional dependency discovery algorithm on distributed data-parallel platforms. In addition, FastApriori is built on the widely-used distributed data-parallel platform Apache Spark.
+FastMFDs is an efficient and scalable functional dependency discovery algorithm on distributed data-parallel platforms. In addition, FastMFDs is built on the widely-used distributed data-parallel platform Apache Spark.
 
 # Environment
 
